@@ -6,7 +6,7 @@
 // @author          Kouqqu
 // @github          https://github.com/Kouqqu/Volu
 // @include         explorer.exe
-// @compilerOptions -lgdiplus -lgdi32 -lole32 -lwinmm -ldwmapi -lshcore
+// @compilerOptions -lgdiplus -lgdi32 -lole32 -lwinmm -ldwmapi -lshcore -lcomctl32
 // ==/WindhawkMod==
 
 // ==WindhawkModReadme==
@@ -35,9 +35,6 @@ Brings the iconic, elegant macOS (OS X Yosemite / El Capitan / Sierra / Mojave) 
     - wood: Wooden Click (macOS Classic)
     - tactile: Modern Tactile Click
     - none: None (Silent)
-- playSoundOnMute: true
-  $name: Play Sound on Mute
-  $description: Whether to play a click sound when muting or unmuting.
 - timeoutMs: 1300
   $name: Display Duration (ms)
   $description: How long the HUD stays visible before fading out.
@@ -55,6 +52,7 @@ Brings the iconic, elegant macOS (OS X Yosemite / El Capitan / Sierra / Mojave) 
 // ==/WindhawkModSettings==
 
 #include <windows.h>
+#include <commctrl.h>
 #include <gdiplus.h>
 #include <mmdeviceapi.h>
 #include <endpointvolume.h>
@@ -121,7 +119,6 @@ enum class Position {
 
 struct Settings {
     SoundScheme soundScheme = SoundScheme::Wood;
-    bool playSoundOnMute = true;
     int timeoutMs = 1300;
     Position position = Position::Center;
     bool enableHotkeys = true;
@@ -150,6 +147,8 @@ static int g_posY = 0;
 
 #define WM_USER_SHOW_HUD (WM_USER + 101)
 #define WM_USER_VOLUME_ACTION (WM_USER + 102)
+#define WM_USER_SETTINGS_CHANGED (WM_USER + 103)
+
 #define IDT_HIDE 1
 #define IDT_FADE_OUT 2
 #define IDT_WATCHDOG 3
@@ -157,10 +156,14 @@ static int g_posY = 0;
 #define HOTKEY_ID_UP 9001
 #define HOTKEY_ID_DOWN 9002
 #define HOTKEY_ID_MUTE 9003
+#define HOTKEY_ID_VOL_UP 9004
+#define HOTKEY_ID_VOL_DOWN 9005
+#define HOTKEY_ID_VOL_MUTE 9006
+
+#define SUBCLASS_ID_TRAY 1001
 
 // --- Sound Playback ---
-void PlayClickSound(bool isMute) {
-    if (isMute && !g_settings.playSoundOnMute) return;
+void PlayClickSound() {
     if (g_settings.soundScheme == SoundScheme::None) return;
 
     const unsigned char* pData = nullptr;
@@ -285,7 +288,7 @@ public:
         }
         m_pEndpoint->SetMasterVolumeLevelScalar(target, NULL);
         g_lastVolume = target;
-        PlayClickSound(false);
+        PlayClickSound();
 
         if (g_hHudWnd) {
             PostMessageW(g_hHudWnd, WM_USER_SHOW_HUD, 0, 0);
@@ -302,7 +305,6 @@ public:
         g_bInternalVolumeChange = true;
         m_pEndpoint->SetMute(newMute, NULL);
         g_lastMuted = (newMute != FALSE);
-        PlayClickSound(newMute != FALSE);
 
         if (g_hHudWnd) {
             PostMessageW(g_hHudWnd, WM_USER_SHOW_HUD, 0, 0);
@@ -319,7 +321,9 @@ HRESULT STDMETHODCALLTYPE AudioEndpointVolumeCallback::OnNotify(PAUDIO_VOLUME_NO
         if (volChanged || muteChanged) {
             g_lastVolume = pNotify->fMasterVolume;
             g_lastMuted = (pNotify->bMuted != FALSE);
-            PlayClickSound(g_lastMuted);
+            if (volChanged && !g_lastMuted) {
+                PlayClickSound();
+            }
             PostMessageW(g_hHudWnd, WM_USER_SHOW_HUD, 0, 0);
         }
     }
@@ -604,12 +608,48 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK HudWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_HOTKEY: {
-            if (wParam == HOTKEY_ID_UP) {
+            if (wParam == HOTKEY_ID_VOL_UP) {
                 if (g_pAudioMgr) g_pAudioMgr->StepVolume(+1);
-            } else if (wParam == HOTKEY_ID_DOWN) {
+            } else if (wParam == HOTKEY_ID_VOL_DOWN) {
                 if (g_pAudioMgr) g_pAudioMgr->StepVolume(-1);
-            } else if (wParam == HOTKEY_ID_MUTE) {
+            } else if (wParam == HOTKEY_ID_VOL_MUTE) {
                 if (g_pAudioMgr) g_pAudioMgr->ToggleMute();
+            } else if (g_settings.enableHotkeys) {
+                if (wParam == HOTKEY_ID_UP) {
+                    if (g_pAudioMgr) g_pAudioMgr->StepVolume(+1);
+                } else if (wParam == HOTKEY_ID_DOWN) {
+                    if (g_pAudioMgr) g_pAudioMgr->StepVolume(-1);
+                } else if (wParam == HOTKEY_ID_MUTE) {
+                    if (g_pAudioMgr) g_pAudioMgr->ToggleMute();
+                }
+            }
+            return 0;
+        }
+
+        case WM_APPCOMMAND: {
+            int cmd = GET_APPCOMMAND_LPARAM(lParam);
+            if (cmd == APPCOMMAND_VOLUME_UP) {
+                if (g_pAudioMgr) g_pAudioMgr->StepVolume(+1);
+                return TRUE;
+            } else if (cmd == APPCOMMAND_VOLUME_DOWN) {
+                if (g_pAudioMgr) g_pAudioMgr->StepVolume(-1);
+                return TRUE;
+            } else if (cmd == APPCOMMAND_VOLUME_MUTE) {
+                if (g_pAudioMgr) g_pAudioMgr->ToggleMute();
+                return TRUE;
+            }
+            break;
+        }
+
+        case WM_USER_SETTINGS_CHANGED: {
+            if (g_settings.enableHotkeys) {
+                RegisterHotKey(hWnd, HOTKEY_ID_UP, MOD_CONTROL | MOD_ALT, VK_UP);
+                RegisterHotKey(hWnd, HOTKEY_ID_DOWN, MOD_CONTROL | MOD_ALT, VK_DOWN);
+                RegisterHotKey(hWnd, HOTKEY_ID_MUTE, MOD_CONTROL | MOD_ALT, 'V');
+            } else {
+                UnregisterHotKey(hWnd, HOTKEY_ID_UP);
+                UnregisterHotKey(hWnd, HOTKEY_ID_DOWN);
+                UnregisterHotKey(hWnd, HOTKEY_ID_MUTE);
             }
             return 0;
         }
@@ -668,6 +708,9 @@ LRESULT CALLBACK HudWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             KillTimer(hWnd, IDT_HIDE);
             KillTimer(hWnd, IDT_FADE_OUT);
             KillTimer(hWnd, IDT_WATCHDOG);
+            UnregisterHotKey(hWnd, HOTKEY_ID_VOL_UP);
+            UnregisterHotKey(hWnd, HOTKEY_ID_VOL_DOWN);
+            UnregisterHotKey(hWnd, HOTKEY_ID_VOL_MUTE);
             UnregisterHotKey(hWnd, HOTKEY_ID_UP);
             UnregisterHotKey(hWnd, HOTKEY_ID_DOWN);
             UnregisterHotKey(hWnd, HOTKEY_ID_MUTE);
@@ -687,7 +730,6 @@ LRESULT CALLBACK HudWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 
 // --- Low-Level Keyboard Hook ---
-// Ultra-fast: only posts async message and returns 1 immediately to never trigger Windows hook timeout!
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION) {
         KBDLLHOOKSTRUCT* pKbd = (KBDLLHOOKSTRUCT*)lParam;
@@ -695,7 +737,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
         bool isUp = (wParam == WM_KEYUP || wParam == WM_SYSKEYUP);
 
         if (isDown || isUp) {
-            // 1. Hardware Multimedia Keys
+            // 1. Hardware Multimedia Keys (Fn keys, keyboard volume buttons)
             if (pKbd->vkCode == VK_VOLUME_UP) {
                 if (isDown && g_hHudWnd) {
                     PostMessageW(g_hHudWnd, WM_USER_VOLUME_ACTION, 1, 0);
@@ -716,35 +758,55 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
             }
 
             // 2. Custom Hotkeys: Ctrl + Alt + Up / Down / V
-            bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0 ||
-                        (GetAsyncKeyState(VK_LCONTROL) & 0x8000) != 0 ||
-                        (GetAsyncKeyState(VK_RCONTROL) & 0x8000) != 0 ||
-                        (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+            if (g_settings.enableHotkeys) {
+                bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0 ||
+                            (GetAsyncKeyState(VK_LCONTROL) & 0x8000) != 0 ||
+                            (GetAsyncKeyState(VK_RCONTROL) & 0x8000) != 0 ||
+                            (GetKeyState(VK_CONTROL) & 0x8000) != 0;
 
-            bool alt = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0 ||
-                       (GetAsyncKeyState(VK_LMENU) & 0x8000) != 0 ||
-                       (GetAsyncKeyState(VK_RMENU) & 0x8000) != 0 ||
-                       (GetKeyState(VK_MENU) & 0x8000) != 0 ||
-                       (pKbd->flags & LLKHF_ALTDOWN) != 0;
+                bool alt = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0 ||
+                           (GetAsyncKeyState(VK_LMENU) & 0x8000) != 0 ||
+                           (GetAsyncKeyState(VK_RMENU) & 0x8000) != 0 ||
+                           (GetKeyState(VK_MENU) & 0x8000) != 0 ||
+                           (pKbd->flags & LLKHF_ALTDOWN) != 0;
 
-            if (g_settings.enableHotkeys && ctrl && alt) {
-                if (pKbd->vkCode == VK_UP) {
-                    if (isDown && g_hHudWnd) PostMessageW(g_hHudWnd, WM_USER_VOLUME_ACTION, 1, 0);
-                    return 1;
-                }
-                if (pKbd->vkCode == VK_DOWN) {
-                    if (isDown && g_hHudWnd) PostMessageW(g_hHudWnd, WM_USER_VOLUME_ACTION, (WPARAM)-1, 0);
-                    return 1;
-                }
-                // Check 'V' via virtual key code, scan code 0x2F (QWERTY V/M) or 0x56
-                if (pKbd->vkCode == 'V' || pKbd->scanCode == 0x2F || pKbd->vkCode == 0x56) {
-                    if (isDown && g_hHudWnd) PostMessageW(g_hHudWnd, WM_USER_VOLUME_ACTION, 0, 0);
-                    return 1;
+                if (ctrl && alt) {
+                    if (pKbd->vkCode == VK_UP) {
+                        if (isDown && g_hHudWnd) PostMessageW(g_hHudWnd, WM_USER_VOLUME_ACTION, 1, 0);
+                        return 1;
+                    }
+                    if (pKbd->vkCode == VK_DOWN) {
+                        if (isDown && g_hHudWnd) PostMessageW(g_hHudWnd, WM_USER_VOLUME_ACTION, (WPARAM)-1, 0);
+                        return 1;
+                    }
+                    // Check 'V' via virtual key code, scan code 0x2F (QWERTY V/M) or 0x56
+                    if (pKbd->vkCode == 'V' || pKbd->scanCode == 0x2F || pKbd->vkCode == 0x56) {
+                        if (isDown && g_hHudWnd) PostMessageW(g_hHudWnd, WM_USER_VOLUME_ACTION, 0, 0);
+                        return 1;
+                    }
                 }
             }
         }
     }
     return CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
+}
+
+// --- Taskbar / Shell Window Subclass for WM_APPCOMMAND ---
+static LRESULT CALLBACK TraySubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) {
+    if (uMsg == WM_APPCOMMAND) {
+        int cmd = GET_APPCOMMAND_LPARAM(lParam);
+        if (cmd == APPCOMMAND_VOLUME_UP) {
+            if (g_pAudioMgr) g_pAudioMgr->StepVolume(+1);
+            return TRUE; // Suppress native Windows volume flyout!
+        } else if (cmd == APPCOMMAND_VOLUME_DOWN) {
+            if (g_pAudioMgr) g_pAudioMgr->StepVolume(-1);
+            return TRUE; // Suppress native Windows volume flyout!
+        } else if (cmd == APPCOMMAND_VOLUME_MUTE) {
+            if (g_pAudioMgr) g_pAudioMgr->ToggleMute();
+            return TRUE; // Suppress native Windows volume flyout!
+        }
+    }
+    return DefSubclassProc(hWnd, uMsg, wParam, lParam);
 }
 
 // --- HUD Thread (Hosts COM, WASAPI, Hook & Window Message Loop) ---
@@ -808,12 +870,29 @@ DWORD WINAPI HudThreadProc(LPVOID lpParam) {
         );
     }
 
-    // 4. Register Global Hotkeys as hardware fallback
-    RegisterHotKey(g_hHudWnd, HOTKEY_ID_UP, MOD_CONTROL | MOD_ALT, VK_UP);
-    RegisterHotKey(g_hHudWnd, HOTKEY_ID_DOWN, MOD_CONTROL | MOD_ALT, VK_DOWN);
-    RegisterHotKey(g_hHudWnd, HOTKEY_ID_MUTE, MOD_CONTROL | MOD_ALT, 'V');
+    // 4. Register Hardware Multimedia Keys (Fn keys, dedicated volume buttons)
+    RegisterHotKey(g_hHudWnd, HOTKEY_ID_VOL_UP, 0, VK_VOLUME_UP);
+    RegisterHotKey(g_hHudWnd, HOTKEY_ID_VOL_DOWN, 0, VK_VOLUME_DOWN);
+    RegisterHotKey(g_hHudWnd, HOTKEY_ID_VOL_MUTE, 0, VK_VOLUME_MUTE);
 
-    // 5. Install Low-Level Keyboard Hook
+    // 5. Register Custom Hotkeys (Ctrl+Alt+Up/Down/V) if enabled
+    if (g_settings.enableHotkeys) {
+        RegisterHotKey(g_hHudWnd, HOTKEY_ID_UP, MOD_CONTROL | MOD_ALT, VK_UP);
+        RegisterHotKey(g_hHudWnd, HOTKEY_ID_DOWN, MOD_CONTROL | MOD_ALT, VK_DOWN);
+        RegisterHotKey(g_hHudWnd, HOTKEY_ID_MUTE, MOD_CONTROL | MOD_ALT, 'V');
+    }
+
+    // 6. Subclass Explorer's Taskbar & Shell Windows to suppress WM_APPCOMMAND volume flyouts
+    HWND hTray = FindWindowW(L"Shell_TrayWnd", NULL);
+    if (hTray) {
+        SetWindowSubclass(hTray, TraySubclassProc, SUBCLASS_ID_TRAY, 0);
+    }
+    HWND hShell = GetShellWindow();
+    if (hShell && hShell != hTray) {
+        SetWindowSubclass(hShell, TraySubclassProc, SUBCLASS_ID_TRAY, 0);
+    }
+
+    // 7. Install Low-Level Keyboard Hook as second intercept layer
     g_hKeyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
     if (!g_hKeyboardHook) {
         HMODULE hMod = NULL;
@@ -822,23 +901,20 @@ DWORD WINAPI HudThreadProc(LPVOID lpParam) {
         g_hKeyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, hMod, 0);
     }
 
-    if (!g_hKeyboardHook) {
-        Wh_Log(L"Failed to install keyboard hook: 0x%08X", GetLastError());
-    } else {
-        Wh_Log(L"Keyboard hook installed successfully on HUD thread");
-    }
-
-    // 6. Set Hook Watchdog Timer (every 2 seconds)
+    // 8. Set Hook Watchdog Timer (every 2 seconds)
     SetTimer(g_hHudWnd, IDT_WATCHDOG, 2000, NULL);
 
-    // 7. Active Message Loop
+    // 9. Active Message Loop
     MSG msg;
     while (GetMessageW(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
 
-    // 8. Cleanup
+    // 10. Cleanup
+    if (hTray) RemoveWindowSubclass(hTray, TraySubclassProc, SUBCLASS_ID_TRAY);
+    if (hShell && hShell != hTray) RemoveWindowSubclass(hShell, TraySubclassProc, SUBCLASS_ID_TRAY);
+
     if (g_hKeyboardHook) {
         UnhookWindowsHookEx(g_hKeyboardHook);
         g_hKeyboardHook = NULL;
@@ -864,15 +940,17 @@ DWORD WINAPI HudThreadProc(LPVOID lpParam) {
 // --- Helper: Safe Boolean Setting Reader with Defaults ---
 bool GetBoolSettingWithDefault(PCWSTR name, bool defaultValue) {
     PCWSTR str = Wh_GetStringSetting(name);
+    if (!str || wcslen(str) == 0) {
+        Wh_FreeStringSetting(str);
+        return defaultValue;
+    }
     bool result = defaultValue;
-    if (str && wcslen(str) > 0) {
-        if (wcscmp(str, L"0") == 0 || _wcsicmp(str, L"false") == 0) {
-            result = false;
-        } else if (wcscmp(str, L"1") == 0 || _wcsicmp(str, L"true") == 0) {
-            result = true;
-        } else {
-            result = (Wh_GetIntSetting(name) != 0);
-        }
+    if (wcscmp(str, L"0") == 0 || _wcsicmp(str, L"false") == 0) {
+        result = false;
+    } else if (wcscmp(str, L"1") == 0 || _wcsicmp(str, L"true") == 0) {
+        result = true;
+    } else {
+        result = (Wh_GetIntSetting(name) != 0);
     }
     Wh_FreeStringSetting(str);
     return result;
@@ -889,8 +967,6 @@ void LoadSettings() {
         g_settings.soundScheme = SoundScheme::Wood;
     }
     Wh_FreeStringSetting(soundSchemeStr);
-
-    g_settings.playSoundOnMute = GetBoolSettingWithDefault(L"playSoundOnMute", true);
 
     int timeout = Wh_GetIntSetting(L"timeoutMs");
     g_settings.timeoutMs = (timeout >= 200) ? timeout : 1300;
@@ -943,6 +1019,9 @@ void Wh_ModUninit() {
 void Wh_ModSettingsChanged() {
     Wh_Log(L"Volu - macOS Volume HUD: Settings changed");
     LoadSettings();
+    if (g_hHudWnd) {
+        PostMessageW(g_hHudWnd, WM_USER_SETTINGS_CHANGED, 0, 0);
+    }
 }
 
 // ============================================================================
