@@ -16,7 +16,7 @@
 Brings the iconic, elegant macOS (OS X Yosemite / El Capitan / Sierra / Mojave) volume HUD overlay to Windows with authentic audio feedback and fullscreen game support.
 
 ## Features
-- **Authentic macOS Design:** Frosted translucent squircle card, crisp dark charcoal speaker icon, and 16 hairline-divided volume segments.
+- **Authentic macOS Design:** Frosted translucent squircle card with soft shadow, exact Apple-proportioned dark charcoal speaker icon, and 16 hairline-divided volume segments.
 - **Audio Feedback:** Authentic macOS wooden pop clicks and modern tactile clicks, played asynchronously with zero UI lag.
 - **Fullscreen & Game Support:** Renders on top of borderless and exclusive fullscreen games using native Windows notification bands (`ZBID_IMMERSIVE_NOTIFICATION`).
 - **Multi-Monitor Smart Placement:** Automatically displays on whichever monitor contains the active game or foreground application.
@@ -135,6 +135,8 @@ static DWORD g_dwHudThreadId = 0;
 static HHOOK g_hKeyboardHook = NULL;
 static std::atomic<bool> g_bInternalVolumeChange(false);
 static std::atomic<bool> g_bRunning(true);
+static float g_lastVolume = -1.0f;
+static bool g_lastMuted = false;
 
 static int g_hudAlpha = 255;
 static HDC g_hMemDC = NULL;
@@ -205,16 +207,26 @@ public:
     bool Initialize() {
         HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), NULL, CLSCTX_INPROC_SERVER,
                                       __uuidof(IMMDeviceEnumerator), (void**)&m_pEnumerator);
-        if (FAILED(hr) || !m_pEnumerator) return false;
+        if (FAILED(hr) || !m_pEnumerator) {
+            Wh_Log(L"CoCreateInstance MMDeviceEnumerator failed: 0x%08X", hr);
+            return false;
+        }
 
         hr = m_pEnumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &m_pDevice);
-        if (FAILED(hr) || !m_pDevice) return false;
+        if (FAILED(hr) || !m_pDevice) {
+            Wh_Log(L"GetDefaultAudioEndpoint failed: 0x%08X", hr);
+            return false;
+        }
 
         hr = m_pDevice->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_INPROC_SERVER, NULL, (void**)&m_pEndpoint);
-        if (FAILED(hr) || !m_pEndpoint) return false;
+        if (FAILED(hr) || !m_pEndpoint) {
+            Wh_Log(L"Activate IAudioEndpointVolume failed: 0x%08X", hr);
+            return false;
+        }
 
         m_pCallback = new AudioEndpointVolumeCallback();
         m_pEndpoint->RegisterControlChangeNotify(m_pCallback);
+        Wh_Log(L"AudioManager initialized successfully");
         return true;
     }
 
@@ -291,13 +303,32 @@ public:
 };
 
 HRESULT STDMETHODCALLTYPE AudioEndpointVolumeCallback::OnNotify(PAUDIO_VOLUME_NOTIFICATION_DATA pNotify) {
-    if (g_bRunning && !g_bInternalVolumeChange && g_hHudWnd) {
-        PostMessageW(g_hHudWnd, WM_USER_SHOW_HUD, 0, 0);
+    if (g_bRunning && !g_bInternalVolumeChange && g_hHudWnd && pNotify) {
+        // Check if state actually changed
+        bool volChanged = (std::abs(pNotify->fMasterVolume - g_lastVolume) > 0.001f);
+        bool muteChanged = (pNotify->bMuted != g_lastMuted);
+
+        if (volChanged || muteChanged) {
+            g_lastVolume = pNotify->fMasterVolume;
+            g_lastMuted = (pNotify->bMuted != FALSE);
+            PlayClickSound(g_lastMuted);
+            PostMessageW(g_hHudWnd, WM_USER_SHOW_HUD, 0, 0);
+        }
     }
     return S_OK;
 }
 
-// --- HUD Rendering ---
+// --- Helper: Add Rounded Rectangle to GraphicsPath ---
+void AddRoundedRect(GraphicsPath& path, float x, float y, float w, float h, float r) {
+    float d = r * 2.0f;
+    path.AddArc(x, y, d, d, 180.0f, 90.0f);
+    path.AddArc(x + w - d, y, d, d, 270.0f, 90.0f);
+    path.AddArc(x + w - d, y + h - d, d, d, 0.0f, 90.0f);
+    path.AddArc(x, y + h - d, d, d, 90.0f, 90.0f);
+    path.CloseFigure();
+}
+
+// --- HUD Rendering (Exact 1:1 Match to WPF Design) ---
 void RenderHudContent(HWND hWnd, float volume, bool isMuted) {
     // 1. Determine active monitor
     HWND hFg = GetForegroundWindow();
@@ -335,9 +366,18 @@ void RenderHudContent(HWND hWnd, float volume, bool isMuted) {
     if (dpi == 0) dpi = 96;
 
     float scale = (float)dpi / 96.0f;
-    int baseSize = 200;
-    int width = (int)std::round(baseSize * scale);
-    int height = (int)std::round(baseSize * scale);
+
+    // Window size: 240x240 to accommodate soft drop shadow
+    int winSize = (int)std::round(240.0f * scale);
+    int width = winSize;
+    int height = winSize;
+
+    // Card size: 200x200, placed at offset (20, 16)
+    float cardX = 20.0f * scale;
+    float cardY = 16.0f * scale;
+    float cardW = 200.0f * scale;
+    float cardH = 200.0f * scale;
+    float cardRadius = 26.0f * scale;
 
     // Screen bounds on target monitor
     int monW = mi.rcMonitor.right - mi.rcMonitor.left;
@@ -345,9 +385,9 @@ void RenderHudContent(HWND hWnd, float volume, bool isMuted) {
     int posX = mi.rcMonitor.left + (monW - width) / 2;
     int posY = mi.rcMonitor.top + (monH - height) / 2;
     if (g_settings.position == Position::Bottom) {
-        posY = mi.rcMonitor.bottom - height - (int)(100.0f * scale);
+        posY = mi.rcMonitor.bottom - height - (int)(80.0f * scale);
     } else if (g_settings.position == Position::Top) {
-        posY = mi.rcMonitor.top + (int)(100.0f * scale);
+        posY = mi.rcMonitor.top + (int)(80.0f * scale);
     }
 
     g_bmpWidth = width;
@@ -370,13 +410,16 @@ void RenderHudContent(HWND hWnd, float volume, bool isMuted) {
     BITMAPINFO bmi = {0};
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     bmi.bmiHeader.biWidth = width;
-    bmi.bmiHeader.biHeight = -height; // Top-down
+    bmi.bmiHeader.biHeight = -height; // Top-down DIB
     bmi.bmiHeader.biPlanes = 1;
     bmi.bmiHeader.biBitCount = 32;
     bmi.bmiHeader.biCompression = BI_RGB;
 
     g_hMemBmp = CreateDIBSection(g_hMemDC, &bmi, DIB_RGB_COLORS, &g_pvBits, NULL, 0);
     g_hOldMemBmp = (HBITMAP)SelectObject(g_hMemDC, g_hMemBmp);
+
+    // Clear DIB memory to 0 (crucial for per-pixel alpha transparency!)
+    memset(g_pvBits, 0, width * height * 4);
 
     // Render with GDI+
     {
@@ -385,38 +428,50 @@ void RenderHudContent(HWND hWnd, float volume, bool isMuted) {
         g.SetSmoothingMode(SmoothingModeAntiAlias);
         g.SetPixelOffsetMode(PixelOffsetModeHalf);
 
-        // 1. Frosted Translucent Card
-        float radius = 26.0f * scale;
-        GraphicsPath cardPath;
-        float d = radius * 2.0f;
-        cardPath.AddArc(0.0f, 0.0f, d, d, 180.0f, 90.0f);
-        cardPath.AddArc((float)width - d, 0.0f, d, d, 270.0f, 90.0f);
-        cardPath.AddArc((float)width - d, (float)height - d, d, d, 0.0f, 90.0f);
-        cardPath.AddArc(0.0f, (float)height - d, d, d, 90.0f, 90.0f);
-        cardPath.CloseFigure();
+        // Clear transparent background
+        g.Clear(Color(0, 0, 0, 0));
 
+        // 1. Soft Drop Shadow (multi-pass smooth shadow)
+        for (int step = 3; step >= 1; --step) {
+            float sOffset = (float)step * 2.0f * scale;
+            float sGrow = (float)step * 1.5f * scale;
+            BYTE sAlpha = (BYTE)(14 * (4 - step)); // Soft cumulative opacity
+            SolidBrush shadowBrush(Color(sAlpha, 0, 0, 0));
+            GraphicsPath sPath;
+            AddRoundedRect(sPath, cardX - sGrow, cardY + sOffset - sGrow, cardW + sGrow * 2.0f, cardH + sGrow * 2.0f, cardRadius + sGrow);
+            g.FillPath(&shadowBrush, &sPath);
+        }
+
+        // 2. Frosted Translucent Card (#C8B0BAC4)
+        GraphicsPath cardPath;
+        AddRoundedRect(cardPath, cardX, cardY, cardW, cardH, cardRadius);
         SolidBrush cardBrush(Color(200, 176, 186, 196));
         g.FillPath(&cardBrush, &cardPath);
 
         // Dark charcoal color (#1C1E24)
         Color darkColor(255, 28, 30, 36);
         SolidBrush darkBrush(darkColor);
-        Pen darkPen(darkColor, 3.5f * scale);
-        darkPen.SetStartCap(LineCapRound);
-        darkPen.SetEndCap(LineCapRound);
 
-        // 2. Speaker Body
-        PointF speakerPts[6] = {
-            PointF(72.0f * scale, 90.0f * scale),
-            PointF(72.0f * scale, 106.0f * scale),
-            PointF(82.0f * scale, 106.0f * scale),
-            PointF(98.0f * scale, 120.0f * scale),
-            PointF(98.0f * scale, 76.0f * scale),
-            PointF(82.0f * scale, 90.0f * scale)
-        };
-        g.FillPolygon(&darkBrush, speakerPts, 6);
+        // 3. Speaker Canvas Area (centered horizontally in card, Y at 38px)
+        float cx0 = cardX + 40.0f * scale;
+        float cy0 = cardY + 38.0f * scale;
 
-        // 3. Sound Waves
+        // Speaker Body: M 8,26 H 25 L 53,7 C 55,5.5 57,7 57,9 V 77 C 57,79 55,80.5 53,79 L 25,60 H 8 C 5.8,60 4,58.2 4,56 V 30 C 4,27.8 5.8,26 8,26 Z
+        GraphicsPath speakerPath;
+        speakerPath.AddLine(cx0 + 8.0f * scale, cy0 + 26.0f * scale, cx0 + 25.0f * scale, cy0 + 26.0f * scale);
+        speakerPath.AddLine(cx0 + 25.0f * scale, cy0 + 26.0f * scale, cx0 + 53.0f * scale, cy0 + 7.0f * scale);
+        speakerPath.AddBezier(cx0 + 53.0f * scale, cy0 + 7.0f * scale, cx0 + 55.0f * scale, cy0 + 5.5f * scale, cx0 + 57.0f * scale, cy0 + 7.0f * scale, cx0 + 57.0f * scale, cy0 + 9.0f * scale);
+        speakerPath.AddLine(cx0 + 57.0f * scale, cy0 + 9.0f * scale, cx0 + 57.0f * scale, cy0 + 77.0f * scale);
+        speakerPath.AddBezier(cx0 + 57.0f * scale, cy0 + 77.0f * scale, cx0 + 57.0f * scale, cy0 + 79.0f * scale, cx0 + 55.0f * scale, cy0 + 80.5f * scale, cx0 + 53.0f * scale, cy0 + 79.0f * scale);
+        speakerPath.AddLine(cx0 + 53.0f * scale, cy0 + 79.0f * scale, cx0 + 25.0f * scale, cy0 + 60.0f * scale);
+        speakerPath.AddLine(cx0 + 25.0f * scale, cy0 + 60.0f * scale, cx0 + 8.0f * scale, cy0 + 60.0f * scale);
+        speakerPath.AddBezier(cx0 + 8.0f * scale, cy0 + 60.0f * scale, cx0 + 5.8f * scale, cy0 + 60.0f * scale, cx0 + 4.0f * scale, cy0 + 58.2f * scale, cx0 + 4.0f * scale, cy0 + 56.0f * scale);
+        speakerPath.AddLine(cx0 + 4.0f * scale, cy0 + 56.0f * scale, cx0 + 4.0f * scale, cy0 + 30.0f * scale);
+        speakerPath.AddBezier(cx0 + 4.0f * scale, cy0 + 30.0f * scale, cx0 + 4.0f * scale, cy0 + 27.8f * scale, cx0 + 5.8f * scale, cy0 + 26.0f * scale, cx0 + 8.0f * scale, cy0 + 26.0f * scale);
+        speakerPath.CloseFigure();
+        g.FillPath(&darkBrush, &speakerPath);
+
+        // 4. Sound Waves
         bool showWave1 = false, showWave2 = false, showWave3 = false;
         if (isMuted) {
             showWave1 = showWave2 = showWave3 = true;
@@ -430,40 +485,50 @@ void RenderHudContent(HWND hWnd, float volume, bool isMuted) {
             }
         }
 
-        float cx = 94.5f * scale;
-        float cy = 98.0f * scale;
+        Pen wavePen(darkColor, 4.2f * scale);
+        wavePen.SetStartCap(LineCapRound);
+        wavePen.SetEndCap(LineCapRound);
 
+        // Wave 1: R=24, Center=(54.5, 43.0), Start=-45, Sweep=90
         if (showWave1) {
-            float r1 = 16.0f * scale;
-            g.DrawArc(&darkPen, cx - r1, cy - r1, 2.0f * r1, 2.0f * r1, -39.0f, 78.0f);
+            float w1_cx = cx0 + 54.5f * scale;
+            float w1_cy = cy0 + 43.0f * scale;
+            float r1 = 24.0f * scale;
+            g.DrawArc(&wavePen, w1_cx - r1, w1_cy - r1, r1 * 2.0f, r1 * 2.0f, -45.0f, 90.0f);
         }
+        // Wave 2: R=38, Center=(57.0, 43.0), Start=-36, Sweep=72
         if (showWave2) {
-            float r2 = 25.0f * scale;
-            g.DrawArc(&darkPen, cx - r2, cy - r2, 2.0f * r2, 2.0f * r2, -40.0f, 80.0f);
+            float w2_cx = cx0 + 57.0f * scale;
+            float w2_cy = cy0 + 43.0f * scale;
+            float r2 = 38.0f * scale;
+            g.DrawArc(&wavePen, w2_cx - r2, w2_cy - r2, r2 * 2.0f, r2 * 2.0f, -36.0f, 72.0f);
         }
+        // Wave 3: R=52, Center=(60.5, 43.0), Start=-32, Sweep=64
         if (showWave3) {
-            float r3 = 35.0f * scale;
-            g.DrawArc(&darkPen, cx - r3, cy - r3, 2.0f * r3, 2.0f * r3, -39.0f, 78.0f);
+            float w3_cx = cx0 + 60.5f * scale;
+            float w3_cy = cy0 + 43.0f * scale;
+            float r3 = 52.0f * scale;
+            g.DrawArc(&wavePen, w3_cx - r3, w3_cy - r3, r3 * 2.0f, r3 * 2.0f, -32.0f, 64.0f);
         }
 
-        // 4. Mute Slash
+        // 5. Classic macOS Mute Slash: X1=4, Y1=14 to X2=118, Y2=72
         if (isMuted) {
-            Pen mutePen(darkColor, 4.2f * scale);
+            Pen mutePen(darkColor, 4.6f * scale);
             mutePen.SetStartCap(LineCapRound);
             mutePen.SetEndCap(LineCapRound);
-            g.DrawLine(&mutePen, 64.0f * scale, 72.0f * scale, 136.0f * scale, 124.0f * scale);
+            g.DrawLine(&mutePen, cx0 + 4.0f * scale, cy0 + 14.0f * scale, cx0 + 118.0f * scale, cy0 + 72.0f * scale);
         }
 
-        // 5. 16-Segment Progress Bar
-        float barX = 27.0f * scale;
-        float barY = 158.0f * scale;
+        // 6. 16-Segment Continuous Rectangular Progress Bar
+        float barX = cardX + 27.0f * scale;
+        float barY = cardY + 162.0f * scale;
         float barW = 146.0f * scale;
         float barH = 8.0f * scale;
 
         // Background track
         g.FillRectangle(&darkBrush, barX, barY, barW, barH);
 
-        // Active segments calculation
+        // Active white segments
         int activeBlocks = isMuted ? 0 : (int)std::round(volume * 16.0f);
         activeBlocks = (std::max)(0, (std::min)(16, activeBlocks));
 
@@ -581,70 +646,6 @@ LRESULT CALLBACK HudWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     return DefWindowProcW(hWnd, uMsg, wParam, lParam);
 }
 
-// --- HUD Thread ---
-DWORD WINAPI HudThreadProc(LPVOID lpParam) {
-    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-
-    GdiplusStartupInput gdiplusStartupInput;
-    GdiplusStartup(&g_gdiplusToken, &gdiplusStartupInput, NULL);
-
-    WNDCLASSEXW wc = {0};
-    wc.cbSize = sizeof(WNDCLASSEXW);
-    wc.lpfnWndProc = HudWndProc;
-    wc.hInstance = GetModuleHandleW(NULL);
-    wc.lpszClassName = L"VoluMacOsVolumeHudWnd";
-    RegisterClassExW(&wc);
-
-    HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
-    pCreateWindowInBand CreateWindowInBand = nullptr;
-    if (hUser32) {
-        CreateWindowInBand = (pCreateWindowInBand)GetProcAddress(hUser32, "CreateWindowInBand");
-    }
-
-    if (CreateWindowInBand) {
-        g_hHudWnd = CreateWindowInBand(
-            WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE,
-            wc.lpszClassName,
-            L"Volu Volume HUD",
-            WS_POPUP,
-            0, 0, 200, 200,
-            NULL, NULL, wc.hInstance, NULL,
-            ZBID_IMMERSIVE_NOTIFICATION
-        );
-        if (g_hHudWnd) {
-            Wh_Log(L"Created HUD window in ZBID_IMMERSIVE_NOTIFICATION band");
-        }
-    }
-
-    if (!g_hHudWnd) {
-        Wh_Log(L"Falling back to standard CreateWindowExW");
-        g_hHudWnd = CreateWindowExW(
-            WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE,
-            wc.lpszClassName,
-            L"Volu Volume HUD",
-            WS_POPUP,
-            0, 0, 200, 200,
-            NULL, NULL, wc.hInstance, NULL
-        );
-    }
-
-    MSG msg;
-    while (GetMessageW(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
-    }
-
-    if (g_hHudWnd) {
-        DestroyWindow(g_hHudWnd);
-        g_hHudWnd = NULL;
-    }
-
-    UnregisterClassW(wc.lpszClassName, wc.hInstance);
-    GdiplusShutdown(g_gdiplusToken);
-    CoUninitialize();
-    return 0;
-}
-
 // --- Low-Level Keyboard Hook ---
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN)) {
@@ -652,7 +653,7 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
         bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
         bool alt = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
 
-        // Native Volume Keys
+        // Native Volume Keys (Interception & Suppression)
         if (pKbd->vkCode == VK_VOLUME_UP) {
             if (g_pAudioMgr) g_pAudioMgr->StepVolume(+1);
             return 1; // Suppress native Windows flyout!
@@ -683,6 +684,105 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
         }
     }
     return CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
+}
+
+// --- HUD Thread (Hosts COM, WASAPI, Hook & Window Message Loop) ---
+DWORD WINAPI HudThreadProc(LPVOID lpParam) {
+    HRESULT hrCom = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    if (FAILED(hrCom)) {
+        Wh_Log(L"CoInitializeEx failed: 0x%08X", hrCom);
+    }
+
+    GdiplusStartupInput gdiplusStartupInput;
+    GdiplusStartup(&g_gdiplusToken, &gdiplusStartupInput, NULL);
+
+    // 1. Initialize Audio Manager on this thread
+    g_pAudioMgr = new AudioManager();
+    if (!g_pAudioMgr->Initialize()) {
+        Wh_Log(L"Failed to initialize Audio Manager");
+    } else {
+        g_lastVolume = g_pAudioMgr->GetVolume();
+        g_lastMuted = g_pAudioMgr->IsMuted();
+    }
+
+    // 2. Register Window Class
+    WNDCLASSEXW wc = {0};
+    wc.cbSize = sizeof(WNDCLASSEXW);
+    wc.lpfnWndProc = HudWndProc;
+    wc.hInstance = GetModuleHandleW(NULL);
+    wc.lpszClassName = L"VoluMacOsVolumeHudWnd";
+    RegisterClassExW(&wc);
+
+    // 3. Create Layered Window in Notification Band
+    HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
+    pCreateWindowInBand CreateWindowInBand = nullptr;
+    if (hUser32) {
+        CreateWindowInBand = (pCreateWindowInBand)GetProcAddress(hUser32, "CreateWindowInBand");
+    }
+
+    if (CreateWindowInBand) {
+        g_hHudWnd = CreateWindowInBand(
+            WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE,
+            wc.lpszClassName,
+            L"Volu Volume HUD",
+            WS_POPUP,
+            0, 0, 240, 240,
+            NULL, NULL, wc.hInstance, NULL,
+            ZBID_IMMERSIVE_NOTIFICATION
+        );
+        if (g_hHudWnd) {
+            Wh_Log(L"Created HUD window in ZBID_IMMERSIVE_NOTIFICATION band");
+        }
+    }
+
+    if (!g_hHudWnd) {
+        Wh_Log(L"Falling back to standard CreateWindowExW");
+        g_hHudWnd = CreateWindowExW(
+            WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE,
+            wc.lpszClassName,
+            L"Volu Volume HUD",
+            WS_POPUP,
+            0, 0, 240, 240,
+            NULL, NULL, wc.hInstance, NULL
+        );
+    }
+
+    // 4. Install Low-Level Keyboard Hook on THIS thread (which has the active message loop!)
+    g_hKeyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, GetModuleHandleW(NULL), 0);
+    if (!g_hKeyboardHook) {
+        Wh_Log(L"Failed to install keyboard hook: 0x%08X", GetLastError());
+    } else {
+        Wh_Log(L"Keyboard hook installed successfully on HUD thread");
+    }
+
+    // 5. Active Message Loop
+    MSG msg;
+    while (GetMessageW(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+
+    // 6. Cleanup
+    if (g_hKeyboardHook) {
+        UnhookWindowsHookEx(g_hKeyboardHook);
+        g_hKeyboardHook = NULL;
+    }
+
+    if (g_hHudWnd) {
+        DestroyWindow(g_hHudWnd);
+        g_hHudWnd = NULL;
+    }
+
+    if (g_pAudioMgr) {
+        g_pAudioMgr->Uninitialize();
+        delete g_pAudioMgr;
+        g_pAudioMgr = nullptr;
+    }
+
+    UnregisterClassW(wc.lpszClassName, wc.hInstance);
+    GdiplusShutdown(g_gdiplusToken);
+    CoUninitialize();
+    return 0;
 }
 
 // --- Settings Management ---
@@ -722,24 +822,11 @@ BOOL Wh_ModInit() {
 
     LoadSettings();
 
-    // Initialize Audio Manager
-    g_pAudioMgr = new AudioManager();
-    if (!g_pAudioMgr->Initialize()) {
-        Wh_Log(L"Failed to initialize Audio Manager");
-    }
-
-    // Spawn HUD Window thread
+    // Spawn dedicated HUD Thread which owns COM, WASAPI, Hook, and Window Message Loop
     g_hHudThread = CreateThread(NULL, 0, HudThreadProc, NULL, 0, &g_dwHudThreadId);
     if (!g_hHudThread) {
         Wh_Log(L"Failed to create HUD thread");
-    }
-
-    // Install Low-Level Keyboard Hook
-    g_hKeyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, GetModuleHandleW(NULL), 0);
-    if (!g_hKeyboardHook) {
-        Wh_Log(L"Failed to install keyboard hook: 0x%08X", GetLastError());
-    } else {
-        Wh_Log(L"Keyboard hook installed successfully");
+        return FALSE;
     }
 
     return TRUE;
@@ -749,11 +836,6 @@ void Wh_ModUninit() {
     Wh_Log(L"Volu - macOS Volume HUD: Uninitializing");
     g_bRunning = false;
 
-    if (g_hKeyboardHook) {
-        UnhookWindowsHookEx(g_hKeyboardHook);
-        g_hKeyboardHook = NULL;
-    }
-
     if (g_dwHudThreadId) {
         PostThreadMessageW(g_dwHudThreadId, WM_QUIT, 0, 0);
         if (g_hHudThread) {
@@ -762,12 +844,6 @@ void Wh_ModUninit() {
             g_hHudThread = NULL;
         }
         g_dwHudThreadId = 0;
-    }
-
-    if (g_pAudioMgr) {
-        g_pAudioMgr->Uninitialize();
-        delete g_pAudioMgr;
-        g_pAudioMgr = nullptr;
     }
 }
 
