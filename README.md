@@ -37,3 +37,15 @@ Also available as a native mod for [Windhawk](https://windhawk.net/) in the [`wi
 <p align="center">
   <a href="https://github.com/Kouqqu/Volu/releases/latest"><b>Download / Скачать</b></a>
 </p>
+
+<br>
+
+<div align="center">
+  <a href="https://t.me/koukkuteka" target="_blank">
+    <img src="https://raw.githubusercontent.com/Kouqqu/aura-reader/main/assets/badge_telegram.svg" alt="Telegram" height="36">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://dalink.to/koukku" target="_blank">
+    <img src="https://raw.githubusercontent.com/Kouqqu/aura-reader/main/assets/badge_donate.svg" alt="Donate" height="36">
+  </a>
+</div>

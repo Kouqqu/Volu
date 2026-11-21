@@ -37,3 +37,15 @@
    - `volu-macos-volume-hud.png`
 3. Создайте Pull Request в ветку `main` репозитория `ramensoftware/windhawk-mods`.
 4. После одобрения автором Windhawk твик появится во встроенном магазине приложения!
+
+<br>
+
+<div align="center">
+  <a href="https://t.me/koukkuteka" target="_blank">
+    <img src="https://raw.githubusercontent.com/Kouqqu/aura-reader/main/assets/badge_telegram.svg" alt="Telegram" height="36">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://dalink.to/koukku" target="_blank">
+    <img src="https://raw.githubusercontent.com/Kouqqu/aura-reader/main/assets/badge_donate.svg" alt="Donate" height="36">
+  </a>
+</div>
