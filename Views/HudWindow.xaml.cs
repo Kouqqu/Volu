@@ -17,8 +17,9 @@ namespace VolumeHUD.Views
         private readonly List<Border> _blocks = new();
         private readonly DispatcherTimer _hideTimer;
 
-        private static readonly Brush ActiveBrush = new SolidColorBrush(Color.FromRgb(245, 245, 247));
-        private static readonly Brush InactiveBrush = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255));
+        // Exact macOS Dark Glass palette
+        private static readonly Brush ActiveBrush = new SolidColorBrush(Color.FromRgb(220, 224, 228));
+        private static readonly Brush InactiveBrush = new SolidColorBrush(Color.FromRgb(53, 59, 68));
 
         public HudWindow()
         {
@@ -71,23 +72,24 @@ namespace VolumeHUD.Views
 
             CenterOnActiveScreen();
 
-            // Update speaker icon
+            // Update speaker icon & waves according to authentic macOS
             if (isMuted)
             {
-                Wave1.Visibility = Visibility.Collapsed;
-                Wave2.Visibility = Visibility.Collapsed;
-                Wave3.Visibility = Visibility.Collapsed;
-                MuteCross.Visibility = Visibility.Visible;
+                // In macOS mute state, speaker body & 3 waves are shown with diagonal strike-through slash
+                Wave1.Visibility = Visibility.Visible;
+                Wave2.Visibility = Visibility.Visible;
+                Wave3.Visibility = Visibility.Visible;
+                MuteSlash.Visibility = Visibility.Visible;
             }
             else
             {
-                MuteCross.Visibility = Visibility.Collapsed;
+                MuteSlash.Visibility = Visibility.Collapsed;
                 Wave1.Visibility = volume > 0.01f ? Visibility.Visible : Visibility.Collapsed;
                 Wave2.Visibility = volume > 0.33f ? Visibility.Visible : Visibility.Collapsed;
                 Wave3.Visibility = volume > 0.66f ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            // Update 16 blocks
+            // Update 16 blocks (all empty when muted)
             int filledCount = isMuted ? 0 : (int)Math.Round(volume * 16.0f);
             for (int i = 0; i < 16; i++)
             {
@@ -100,15 +102,11 @@ namespace VolumeHUD.Views
             var hwnd = new WindowInteropHelper(this).Handle;
             if (hwnd != IntPtr.Zero)
             {
-                Win32.SetWindowPos(
-                    hwnd,
-                    Win32.HWND_TOPMOST,
-                    0, 0, 0, 0,
-                    Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW
-                );
+                Win32.SetWindowPos(hwnd, Win32.HWND_TOPMOST, 0, 0, 0, 0,
+                    Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW);
             }
 
-            // Clear previous animation and snap to full opacity
+            // Animate fade-in
             BeginAnimation(OpacityProperty, null);
             Opacity = 1.0;
 
@@ -117,44 +115,26 @@ namespace VolumeHUD.Views
             _hideTimer.Start();
         }
 
-        private void OnHideTimerTick(object? sender, EventArgs e)
-        {
-            _hideTimer.Stop();
-
-            // Smooth fade out
-            var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(200))
-            {
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
-            };
-            fadeOut.Completed += (s, ev) =>
-            {
-                BeginAnimation(OpacityProperty, null);
-                Opacity = 0.0;
-            };
-
-            BeginAnimation(OpacityProperty, fadeOut);
-        }
-
         private void CenterOnActiveScreen()
         {
             try
             {
-                // First attempt: check the monitor of the current foreground window (e.g. fullscreen game)
+                // Find screen of foreground window (e.g. fullscreen game)
                 IntPtr fgHwnd = Win32.GetForegroundWindow();
-                System.Windows.Forms.Screen screen = (fgHwnd != IntPtr.Zero)
+                var screen = (fgHwnd != IntPtr.Zero)
                     ? System.Windows.Forms.Screen.FromHandle(fgHwnd)
-                    : System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position);
+                    : System.Windows.Forms.Screen.PrimaryScreen ?? System.Windows.Forms.Screen.AllScreens[0];
 
-                var dpi = VisualTreeHelper.GetDpi(this);
-                double dpiX = dpi.DpiScaleX;
-                double dpiY = dpi.DpiScaleY;
+                var bounds = screen.Bounds;
+                var source = PresentationSource.FromVisual(this);
+                double dpiX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+                double dpiY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
 
-                double screenLeft = screen.Bounds.Left / dpiX;
-                double screenTop = screen.Bounds.Top / dpiY;
-                double screenWidth = screen.Bounds.Width / dpiX;
-                double screenHeight = screen.Bounds.Height / dpiY;
+                double screenWidth = bounds.Width / dpiX;
+                double screenHeight = bounds.Height / dpiY;
+                double screenLeft = bounds.Left / dpiX;
+                double screenTop = bounds.Top / dpiY;
 
-                // Dead center on the active monitor
                 Left = screenLeft + (screenWidth - Width) / 2.0;
                 Top = screenTop + (screenHeight - Height) / 2.0;
             }
@@ -163,6 +143,29 @@ namespace VolumeHUD.Views
                 Left = (SystemParameters.PrimaryScreenWidth - Width) / 2.0;
                 Top = (SystemParameters.PrimaryScreenHeight - Height) / 2.0;
             }
+        }
+
+        private void OnHideTimerTick(object? sender, EventArgs e)
+        {
+            _hideTimer.Stop();
+
+            var fadeOut = new DoubleAnimation
+            {
+                From = Opacity,
+                To = 0.0,
+                Duration = TimeSpan.FromMilliseconds(250),
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            };
+
+            fadeOut.Completed += (s, args) =>
+            {
+                if (Opacity == 0.0)
+                {
+                    Hide();
+                }
+            };
+
+            BeginAnimation(OpacityProperty, fadeOut);
         }
     }
 }

@@ -135,8 +135,9 @@ namespace VolumeHUD.Hooks
 
                 bool isVolUp = kbd.vkCode == Win32.VK_VOLUME_UP || (isCtrl && isAlt && kbd.vkCode == Win32.VK_UP);
                 bool isVolDown = kbd.vkCode == Win32.VK_VOLUME_DOWN || (isCtrl && isAlt && kbd.vkCode == Win32.VK_DOWN);
-                // Mute: physical VK_VOLUME_MUTE or Ctrl+Alt+V
-                bool isMute = kbd.vkCode == Win32.VK_VOLUME_MUTE || (isCtrl && isAlt && kbd.vkCode == 0x56);
+                // Mute: physical VK_VOLUME_MUTE or Ctrl+Alt+V (supporting both VK 0x56 and hardware ScanCode 0x2F for any layout)
+                bool isVKey = kbd.vkCode == 0x56 || kbd.scanCode == 0x2F;
+                bool isMute = kbd.vkCode == Win32.VK_VOLUME_MUTE || (isCtrl && isAlt && isVKey);
 
                 if (isVolUp || isVolDown || isMute)
                 {
