@@ -1,16 +1,33 @@
-# Volu
+<h1 align="center">Volu</h1>
 
 <p align="center">
   <img src="preview.png" alt="Volu" width="220" />
 </p>
 
-Аутентичный индикатор громкости в стиле macOS для Windows. 
+<p align="center">
+  Authentic macOS-style volume HUD for Windows.
+</p>
 
-Заменяет стандартный ползунок Windows на классический всплывающий оверлей с мягким звуковым щелчком при изменении громкости.
+### Shortcuts
 
-Для клавиатур без мультимедийных клавиш поддерживаются сочетания:
+- `Ctrl + Alt + Up` — Volume Up
+- `Ctrl + Alt + Down` — Volume Down
+- `Ctrl + Alt + M` — Mute / Unmute
+
+---
+
+<p align="center">
+  Аутентичный индикатор громкости в стиле macOS для Windows.
+</p>
+
+### Горячие клавиши
+
 - `Ctrl + Alt + Вверх` — увеличить громкость
 - `Ctrl + Alt + Вниз` — уменьшить громкость
 - `Ctrl + Alt + M` — выключить / включить звук
 
-### [Скачать Volu (Releases)](https://github.com/Kouqqu/Volu/releases/latest)
+<br>
+
+<p align="center">
+  <a href="https://github.com/Kouqqu/Volu/releases/latest"><b>Download / Скачать</b></a>
+</p>

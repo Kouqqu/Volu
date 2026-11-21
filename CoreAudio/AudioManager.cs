@@ -1,5 +1,6 @@
 using System;
 using NAudio.CoreAudioApi;
+using VolumeHUD.Native;
 
 namespace VolumeHUD.CoreAudio
 {
@@ -12,7 +13,7 @@ namespace VolumeHUD.CoreAudio
         private MMDevice? _defaultDevice;
         private AudioEndpointVolume? _endpointVolume;
 
-        public event Action<float, bool>? VolumeChanged;
+        public event Action<float, bool>? VolumeHudRequested;
 
         public const float Step = 1.0f / 16.0f; // 6.25% matches 16 blocks exactly
 
@@ -43,7 +44,7 @@ namespace VolumeHUD.CoreAudio
 
         private void OnVolumeNotification(AudioVolumeNotificationData data)
         {
-            VolumeChanged?.Invoke(data.MasterVolume, data.Muted);
+            // Keeps device volume synchronized without triggering the on-screen HUD
         }
 
         public float CurrentVolume
@@ -96,12 +97,7 @@ namespace VolumeHUD.CoreAudio
                 float target = nextBlock / 16.0f;
 
                 _endpointVolume.MasterVolumeLevelScalar = target;
-
-                // If volume was already at maximum (target == current), WASAPI notification won't fire, so trigger HUD explicitly
-                if (MathF.Abs(target - current) < 0.001f)
-                {
-                    VolumeChanged?.Invoke(target, false);
-                }
+                VolumeHudRequested?.Invoke(target, false);
             }
             catch
             {
@@ -127,12 +123,7 @@ namespace VolumeHUD.CoreAudio
                 float target = prevBlock / 16.0f;
 
                 _endpointVolume.MasterVolumeLevelScalar = target;
-
-                // If volume was already at minimum (target == current), WASAPI notification won't fire, so trigger HUD explicitly
-                if (MathF.Abs(target - current) < 0.001f)
-                {
-                    VolumeChanged?.Invoke(target, false);
-                }
+                VolumeHudRequested?.Invoke(target, false);
             }
             catch
             {
@@ -146,7 +137,16 @@ namespace VolumeHUD.CoreAudio
             {
                 EnsureDevice();
                 if (_endpointVolume == null) return;
-                _endpointVolume.Mute = !_endpointVolume.Mute;
+
+                bool newMute = !_endpointVolume.Mute;
+                _endpointVolume.Mute = newMute;
+
+                VolumeHudRequested?.Invoke(_endpointVolume.MasterVolumeLevelScalar, newMute);
+
+                if (!newMute)
+                {
+                    SoundEngine.Play();
+                }
             }
             catch
             {

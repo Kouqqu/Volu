@@ -53,7 +53,7 @@ namespace VolumeHUD
                 _mediaKeyHook = new MediaKeyHook();
                 _mediaKeyHook.Start(hwnd);
 
-                AudioManager.Instance.VolumeChanged += (vol, muted) =>
+                AudioManager.Instance.VolumeHudRequested += (vol, muted) =>
                 {
                     _hudWindow.UpdateVolume(vol, muted);
                 };
