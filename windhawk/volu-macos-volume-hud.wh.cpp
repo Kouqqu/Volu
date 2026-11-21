@@ -4,7 +4,7 @@
 // @description     Authentic macOS-style volume HUD for Windows with audio clicks
 // @version         1.0.0
 // @author          Kouqqu
-// @github          https://github.com/Kouqqu/Volu
+// @github          https://github.com/Kouqqu
 // @include         explorer.exe
 // @compilerOptions -lgdiplus -lgdi32 -lole32 -lwinmm -ldwmapi -lshcore -lcomctl32
 // ==/WindhawkMod==
