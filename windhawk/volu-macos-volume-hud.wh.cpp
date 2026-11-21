@@ -20,7 +20,7 @@ Brings the iconic, elegant macOS (OS X Yosemite / El Capitan / Sierra / Mojave) 
 - **Audio Feedback:** Authentic macOS wooden pop clicks and modern tactile clicks, played asynchronously with zero UI lag.
 - **Fullscreen & Game Support:** Renders on top of borderless and exclusive fullscreen games using native Windows notification bands (`ZBID_IMMERSIVE_NOTIFICATION`).
 - **Multi-Monitor Smart Placement:** Automatically displays on whichever monitor contains the active game or foreground application.
-- **Native Flyout Replacement:** Suppresses the default Windows volume flyout when volume keys are pressed.
+- **Native Flyout Replacement:** Completely suppresses the default Windows volume flyout when volume keys are pressed.
 - **Customizable:** Change sound styles, timeout duration, position, and hotkeys in Windhawk settings.
 - **Default Hotkeys:** `Ctrl+Alt+Up` (Vol Up), `Ctrl+Alt+Down` (Vol Down), `Ctrl+Alt+V` (Mute/Unmute).
 */
@@ -275,8 +275,10 @@ public:
         g_bInternalVolumeChange = true;
         if (IsMuted() && step > 0) {
             m_pEndpoint->SetMute(FALSE, NULL);
+            g_lastMuted = false;
         }
         m_pEndpoint->SetMasterVolumeLevelScalar(target, NULL);
+        g_lastVolume = target;
         PlayClickSound(false);
 
         if (g_hHudWnd) {
@@ -293,6 +295,7 @@ public:
 
         g_bInternalVolumeChange = true;
         m_pEndpoint->SetMute(newMute, NULL);
+        g_lastMuted = (newMute != FALSE);
         PlayClickSound(newMute != FALSE);
 
         if (g_hHudWnd) {
@@ -304,7 +307,6 @@ public:
 
 HRESULT STDMETHODCALLTYPE AudioEndpointVolumeCallback::OnNotify(PAUDIO_VOLUME_NOTIFICATION_DATA pNotify) {
     if (g_bRunning && !g_bInternalVolumeChange && g_hHudWnd && pNotify) {
-        // Check if state actually changed
         bool volChanged = (std::abs(pNotify->fMasterVolume - g_lastVolume) > 0.001f);
         bool muteChanged = (pNotify->bMuted != g_lastMuted);
 
@@ -425,6 +427,8 @@ void RenderHudContent(HWND hWnd, float volume, bool isMuted) {
     {
         Bitmap bmp(width, height, PixelFormat32bppPARGB);
         Graphics g(&bmp);
+
+        // Anti-aliasing for curves and smooth shapes
         g.SetSmoothingMode(SmoothingModeAntiAlias);
         g.SetPixelOffsetMode(PixelOffsetModeHalf);
 
@@ -435,7 +439,7 @@ void RenderHudContent(HWND hWnd, float volume, bool isMuted) {
         for (int step = 3; step >= 1; --step) {
             float sOffset = (float)step * 2.0f * scale;
             float sGrow = (float)step * 1.5f * scale;
-            BYTE sAlpha = (BYTE)(14 * (4 - step)); // Soft cumulative opacity
+            BYTE sAlpha = (BYTE)(14 * (4 - step));
             SolidBrush shadowBrush(Color(sAlpha, 0, 0, 0));
             GraphicsPath sPath;
             AddRoundedRect(sPath, cardX - sGrow, cardY + sOffset - sGrow, cardW + sGrow * 2.0f, cardH + sGrow * 2.0f, cardRadius + sGrow);
@@ -456,7 +460,7 @@ void RenderHudContent(HWND hWnd, float volume, bool isMuted) {
         float cx0 = cardX + 40.0f * scale;
         float cy0 = cardY + 38.0f * scale;
 
-        // Speaker Body: M 8,26 H 25 L 53,7 C 55,5.5 57,7 57,9 V 77 C 57,79 55,80.5 53,79 L 25,60 H 8 C 5.8,60 4,58.2 4,56 V 30 C 4,27.8 5.8,26 8,26 Z
+        // Speaker Body: exact XAML path M 8,26 H 25 L 53,7 C 55,5.5 57,7 57,9 V 77 C 57,79 55,80.5 53,79 L 25,60 H 8 C 5.8,60 4,58.2 4,56 V 30 C 4,27.8 5.8,26 8,26 Z
         GraphicsPath speakerPath;
         speakerPath.AddLine(cx0 + 8.0f * scale, cy0 + 26.0f * scale, cx0 + 25.0f * scale, cy0 + 26.0f * scale);
         speakerPath.AddLine(cx0 + 25.0f * scale, cy0 + 26.0f * scale, cx0 + 53.0f * scale, cy0 + 7.0f * scale);
@@ -520,10 +524,14 @@ void RenderHudContent(HWND hWnd, float volume, bool isMuted) {
         }
 
         // 6. 16-Segment Continuous Rectangular Progress Bar
-        float barX = cardX + 27.0f * scale;
-        float barY = cardY + 162.0f * scale;
-        float barW = 146.0f * scale;
-        float barH = 8.0f * scale;
+        // Snap to whole integer device pixels with SmoothingModeNone for razor-sharp hairline dividers
+        g.SetSmoothingMode(SmoothingModeNone);
+        g.SetPixelOffsetMode(PixelOffsetModeNone);
+
+        int barX = (int)std::round(cardX + 27.0f * scale);
+        int barY = (int)std::round(cardY + 162.0f * scale);
+        int barW = (int)std::round(146.0f * scale);
+        int barH = (int)std::round(8.0f * scale);
 
         // Background track
         g.FillRectangle(&darkBrush, barX, barY, barW, barH);
@@ -535,22 +543,22 @@ void RenderHudContent(HWND hWnd, float volume, bool isMuted) {
         SolidBrush whiteBrush(Color(255, 255, 255, 255));
         Pen dividerPen(darkColor, 1.0f);
 
-        float segW = barW / 16.0f;
         for (int i = 0; i < 16; ++i) {
-            float x0 = barX + (float)i * segW;
-            float x1 = barX + (float)(i + 1) * segW;
+            int x0 = barX + (int)std::round((float)i * (float)barW / 16.0f);
+            int x1 = barX + (int)std::round((float)(i + 1) * (float)barW / 16.0f);
 
             if (i < activeBlocks) {
                 g.FillRectangle(&whiteBrush, x0, barY, x1 - x0, barH);
             }
             if (i < 15) {
-                g.DrawLine(&dividerPen, x1, barY, x1, barY + barH);
+                // Razor-sharp 1px divider
+                g.DrawLine(&dividerPen, x1 - 1, barY, x1 - 1, barY + barH);
             }
         }
 
-        // 1px Border around bar
+        // Crisp 1px Border around bar
         Pen borderPen(darkColor, 1.0f);
-        g.DrawRectangle(&borderPen, barX, barY, barW, barH);
+        g.DrawRectangle(&borderPen, barX, barY, barW - 1, barH - 1);
 
         // Copy PARGB bits to DIB section
         BitmapData data;
@@ -648,38 +656,52 @@ LRESULT CALLBACK HudWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
 // --- Low-Level Keyboard Hook ---
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
-    if (nCode == HC_ACTION && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN)) {
+    if (nCode == HC_ACTION) {
         KBDLLHOOKSTRUCT* pKbd = (KBDLLHOOKSTRUCT*)lParam;
-        bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
-        bool alt = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+        bool isDown = (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN);
+        bool isUp = (wParam == WM_KEYUP || wParam == WM_SYSKEYUP);
 
-        // Native Volume Keys (Interception & Suppression)
-        if (pKbd->vkCode == VK_VOLUME_UP) {
-            if (g_pAudioMgr) g_pAudioMgr->StepVolume(+1);
-            return 1; // Suppress native Windows flyout!
-        }
-        if (pKbd->vkCode == VK_VOLUME_DOWN) {
-            if (g_pAudioMgr) g_pAudioMgr->StepVolume(-1);
-            return 1; // Suppress native Windows flyout!
-        }
-        if (pKbd->vkCode == VK_VOLUME_MUTE) {
-            if (g_pAudioMgr) g_pAudioMgr->ToggleMute();
-            return 1; // Suppress native Windows flyout!
-        }
+        if (isDown || isUp) {
+            // 1. Hardware Multimedia Keys
+            if (pKbd->vkCode == VK_VOLUME_UP) {
+                if (isDown && g_pAudioMgr) g_pAudioMgr->StepVolume(+1);
+                return 1; // Suppress BOTH key-down and key-up from Windows!
+            }
+            if (pKbd->vkCode == VK_VOLUME_DOWN) {
+                if (isDown && g_pAudioMgr) g_pAudioMgr->StepVolume(-1);
+                return 1; // Suppress BOTH key-down and key-up from Windows!
+            }
+            if (pKbd->vkCode == VK_VOLUME_MUTE) {
+                if (isDown && g_pAudioMgr) g_pAudioMgr->ToggleMute();
+                return 1; // Suppress BOTH key-down and key-up from Windows!
+            }
 
-        // Custom Hotkeys: Ctrl + Alt + Up/Down/V
-        if (g_settings.enableHotkeys && ctrl && alt) {
-            if (pKbd->vkCode == VK_UP) {
-                if (g_pAudioMgr) g_pAudioMgr->StepVolume(+1);
-                return 1;
-            }
-            if (pKbd->vkCode == VK_DOWN) {
-                if (g_pAudioMgr) g_pAudioMgr->StepVolume(-1);
-                return 1;
-            }
-            if (pKbd->vkCode == 'V') {
-                if (g_pAudioMgr) g_pAudioMgr->ToggleMute();
-                return 1;
+            // 2. Custom Hotkeys: Ctrl + Alt + Up / Down / V
+            bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0 ||
+                        (GetAsyncKeyState(VK_LCONTROL) & 0x8000) != 0 ||
+                        (GetAsyncKeyState(VK_RCONTROL) & 0x8000) != 0 ||
+                        (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+
+            bool alt = (GetAsyncKeyState(VK_MENU) & 0x8000) != 0 ||
+                       (GetAsyncKeyState(VK_LMENU) & 0x8000) != 0 ||
+                       (GetAsyncKeyState(VK_RMENU) & 0x8000) != 0 ||
+                       (GetKeyState(VK_MENU) & 0x8000) != 0 ||
+                       (pKbd->flags & LLKHF_ALTDOWN) != 0;
+
+            if (g_settings.enableHotkeys && ctrl && alt) {
+                if (pKbd->vkCode == VK_UP) {
+                    if (isDown && g_pAudioMgr) g_pAudioMgr->StepVolume(+1);
+                    return 1;
+                }
+                if (pKbd->vkCode == VK_DOWN) {
+                    if (isDown && g_pAudioMgr) g_pAudioMgr->StepVolume(-1);
+                    return 1;
+                }
+                // Check 'V' via virtual key code, scan code 0x2F (QWERTY V/M) or 0x56
+                if (pKbd->vkCode == 'V' || pKbd->scanCode == 0x2F || pKbd->vkCode == 0x56) {
+                    if (isDown && g_pAudioMgr) g_pAudioMgr->ToggleMute();
+                    return 1;
+                }
             }
         }
     }
@@ -747,8 +769,16 @@ DWORD WINAPI HudThreadProc(LPVOID lpParam) {
         );
     }
 
-    // 4. Install Low-Level Keyboard Hook on THIS thread (which has the active message loop!)
-    g_hKeyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, GetModuleHandleW(NULL), 0);
+    // 4. Install Low-Level Keyboard Hook on THIS thread using the exact DLL HMODULE
+    HMODULE hMod = NULL;
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       (LPCWSTR)&LowLevelKeyboardProc, &hMod);
+
+    g_hKeyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, hMod, 0);
+    if (!g_hKeyboardHook) {
+        g_hKeyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
+    }
+
     if (!g_hKeyboardHook) {
         Wh_Log(L"Failed to install keyboard hook: 0x%08X", GetLastError());
     } else {
@@ -785,6 +815,23 @@ DWORD WINAPI HudThreadProc(LPVOID lpParam) {
     return 0;
 }
 
+// --- Helper: Safe Boolean Setting Reader with Defaults ---
+bool GetBoolSettingWithDefault(PCWSTR name, bool defaultValue) {
+    PCWSTR str = Wh_GetStringSetting(name);
+    bool result = defaultValue;
+    if (str && wcslen(str) > 0) {
+        if (wcscmp(str, L"0") == 0 || _wcsicmp(str, L"false") == 0) {
+            result = false;
+        } else if (wcscmp(str, L"1") == 0 || _wcsicmp(str, L"true") == 0) {
+            result = true;
+        } else {
+            result = (Wh_GetIntSetting(name) != 0);
+        }
+    }
+    Wh_FreeStringSetting(str);
+    return result;
+}
+
 // --- Settings Management ---
 void LoadSettings() {
     PCWSTR soundSchemeStr = Wh_GetStringSetting(L"soundScheme");
@@ -797,7 +844,7 @@ void LoadSettings() {
     }
     Wh_FreeStringSetting(soundSchemeStr);
 
-    g_settings.playSoundOnMute = Wh_GetIntSetting(L"playSoundOnMute") != 0;
+    g_settings.playSoundOnMute = GetBoolSettingWithDefault(L"playSoundOnMute", true);
 
     int timeout = Wh_GetIntSetting(L"timeoutMs");
     g_settings.timeoutMs = (timeout >= 200) ? timeout : 1300;
@@ -812,7 +859,7 @@ void LoadSettings() {
     }
     Wh_FreeStringSetting(posStr);
 
-    g_settings.enableHotkeys = Wh_GetIntSetting(L"enableHotkeys") != 0;
+    g_settings.enableHotkeys = GetBoolSettingWithDefault(L"enableHotkeys", true);
 }
 
 // --- Windhawk Entry Points ---
