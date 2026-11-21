@@ -15,7 +15,9 @@
 - `Ctrl + Alt + V` — Mute / Unmute
 
 ### Windhawk Mod
-Also available as a native mod for [Windhawk](https://windhawk.net/) in the [`windhawk/`](windhawk/) folder (or from [Releases](https://github.com/Kouqqu/Volu/releases/latest)).
+
+1. Open **Windhawk** → `...` (Developer options) → **Create new mod**.
+2. Paste the code from [`windhawk/volu-macos-volume-hud.wh.cpp`](windhawk/volu-macos-volume-hud.wh.cpp) and click **Compile** (`Ctrl + B`).
 
 ---
 
@@ -30,7 +32,9 @@ Also available as a native mod for [Windhawk](https://windhawk.net/) in the [`wi
 - `Ctrl + Alt + V` — выключить / включить звук
 
 ### Версия для Windhawk
-Также доступна в виде мода для [Windhawk](https://windhawk.net/) в папке [`windhawk/`](windhawk/) (или в [Релизах](https://github.com/Kouqqu/Volu/releases/latest)).
+
+1. Откройте **Windhawk** → меню `...` (Параметры разработчика) → **Создать новый мод**.
+2. Вставьте код из [`windhawk/volu-macos-volume-hud.wh.cpp`](windhawk/volu-macos-volume-hud.wh.cpp) и нажмите **Скомпилировать** (`Ctrl + B`).
 
 <br>
 
