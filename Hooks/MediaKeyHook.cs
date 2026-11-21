@@ -29,7 +29,6 @@ namespace VolumeHUD.Hooks
         private const int HOTKEY_ID_UP = 9001;
         private const int HOTKEY_ID_DOWN = 9002;
         private const int HOTKEY_ID_MUTE = 9003;
-        private const int HOTKEY_ID_MUTE_V = 9004;
 
         public void Start(IntPtr hwnd)
         {
@@ -37,13 +36,12 @@ namespace VolumeHUD.Hooks
 
             EnsureHookInstalled();
 
-            // Register Global Hotkeys as secondary fallback: Ctrl + Alt + Up/Down/M
+            // Register Global Hotkeys as secondary fallback: Ctrl + Alt + Up/Down/V
             if (_hwnd != IntPtr.Zero)
             {
                 Win32.RegisterHotKey(_hwnd, HOTKEY_ID_UP, Win32.MOD_CONTROL | Win32.MOD_ALT, Win32.VK_UP);
                 Win32.RegisterHotKey(_hwnd, HOTKEY_ID_DOWN, Win32.MOD_CONTROL | Win32.MOD_ALT, Win32.VK_DOWN);
-                Win32.RegisterHotKey(_hwnd, HOTKEY_ID_MUTE, Win32.MOD_CONTROL | Win32.MOD_ALT, Win32.VK_M);
-                Win32.RegisterHotKey(_hwnd, HOTKEY_ID_MUTE_V, Win32.MOD_CONTROL | Win32.MOD_ALT, 0x56); // Key 'V' is 'М' on Russian layout
+                Win32.RegisterHotKey(_hwnd, HOTKEY_ID_MUTE, Win32.MOD_CONTROL | Win32.MOD_ALT, 0x56); // Key 'V'
 
                 ComponentDispatcher.ThreadFilterMessage += OnThreadFilterMessage;
             }
@@ -88,7 +86,6 @@ namespace VolumeHUD.Hooks
                 Win32.UnregisterHotKey(_hwnd, HOTKEY_ID_UP);
                 Win32.UnregisterHotKey(_hwnd, HOTKEY_ID_DOWN);
                 Win32.UnregisterHotKey(_hwnd, HOTKEY_ID_MUTE);
-                Win32.UnregisterHotKey(_hwnd, HOTKEY_ID_MUTE_V);
                 _hwnd = IntPtr.Zero;
             }
         }
@@ -116,7 +113,7 @@ namespace VolumeHUD.Hooks
                     });
                     handled = true;
                 }
-                else if (id == HOTKEY_ID_MUTE || id == HOTKEY_ID_MUTE_V)
+                else if (id == HOTKEY_ID_MUTE)
                 {
                     ThreadPool.QueueUserWorkItem(_ =>
                     {
@@ -138,8 +135,8 @@ namespace VolumeHUD.Hooks
 
                 bool isVolUp = kbd.vkCode == Win32.VK_VOLUME_UP || (isCtrl && isAlt && kbd.vkCode == Win32.VK_UP);
                 bool isVolDown = kbd.vkCode == Win32.VK_VOLUME_DOWN || (isCtrl && isAlt && kbd.vkCode == Win32.VK_DOWN);
-                // Mute: physical VK_VOLUME_MUTE, or Ctrl+Alt+M (0x4D, 'Ь' on RU), or Ctrl+Alt+V (0x56, 'М' on RU)
-                bool isMute = kbd.vkCode == Win32.VK_VOLUME_MUTE || (isCtrl && isAlt && (kbd.vkCode == 0x4D || kbd.vkCode == 0x56));
+                // Mute: physical VK_VOLUME_MUTE or Ctrl+Alt+V
+                bool isMute = kbd.vkCode == Win32.VK_VOLUME_MUTE || (isCtrl && isAlt && kbd.vkCode == 0x56);
 
                 if (isVolUp || isVolDown || isMute)
                 {

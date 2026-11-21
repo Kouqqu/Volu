@@ -12,7 +12,7 @@
 
 - `Ctrl + Alt + Up` — Volume Up
 - `Ctrl + Alt + Down` — Volume Down
-- `Ctrl + Alt + M` — Mute / Unmute
+- `Ctrl + Alt + V` — Mute / Unmute
 
 ---
 
@@ -24,7 +24,7 @@
 
 - `Ctrl + Alt + Вверх` — увеличить громкость
 - `Ctrl + Alt + Вниз` — уменьшить громкость
-- `Ctrl + Alt + M` — выключить / включить звук
+- `Ctrl + Alt + V` — выключить / включить звук
 
 <br>
 
