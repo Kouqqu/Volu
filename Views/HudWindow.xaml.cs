@@ -18,22 +18,25 @@ namespace VolumeHUD.Views
         private readonly DispatcherTimer _hideTimer;
 
         // Classic macOS HUD: White filled segments over a continuous dark track
-        private static readonly Brush ActiveBrush = new SolidColorBrush(Color.FromRgb(255, 255, 255));
-        private static readonly Brush InactiveBrush = System.Windows.Media.Brushes.Transparent;
+        private static readonly Brush BorderColorBrush = new SolidColorBrush(Color.FromRgb(28, 30, 36)); // #1C1E24
+        private static readonly Brush ActiveBrush = new SolidColorBrush(Color.FromRgb(255, 255, 255)); // Pure White
+        private static readonly Brush InactiveBrush = System.Windows.Media.Brushes.Transparent; // Shows dark track
 
         public HudWindow()
         {
             InitializeComponent();
 
-            // Create 16 segmented blocks separated by 1px hairline dividers
+            // Create 16 segmented blocks separated by exact 1px hairline border strokes
             for (int i = 0; i < 16; i++)
             {
                 var block = new Border
                 {
-                    Margin = (i < 15) ? new Thickness(0, 0, 1, 0) : new Thickness(0),
+                    BorderBrush = BorderColorBrush,
+                    BorderThickness = (i < 15) ? new Thickness(0, 0, 1, 0) : new Thickness(0),
                     Background = InactiveBrush,
                     SnapsToDevicePixels = true
                 };
+                Grid.SetColumn(block, i);
                 _blocks.Add(block);
                 SegmentsGrid.Children.Add(block);
             }
@@ -87,7 +90,7 @@ namespace VolumeHUD.Views
                 Wave3.Visibility = volume > 0.66f ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            // Update 16 blocks (all empty/transparent showing dark track when muted)
+            // Update 16 blocks (all transparent showing dark track when muted)
             int filledCount = isMuted ? 0 : (int)Math.Round(volume * 16.0f);
             for (int i = 0; i < 16; i++)
             {

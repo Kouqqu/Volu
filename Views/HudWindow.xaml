@@ -18,11 +18,11 @@
         <Border x:Name="HudBorder"
                 Width="200" Height="200"
                 CornerRadius="26"
-                Background="#BA54606E"
+                Background="#C8B0BAC4"
                 SnapsToDevicePixels="True">
 
             <Border.Effect>
-                <DropShadowEffect Color="#000000" BlurRadius="22" ShadowDepth="4" Opacity="0.30" Direction="270" />
+                <DropShadowEffect Color="#000000" BlurRadius="22" ShadowDepth="4" Opacity="0.25" Direction="270" />
             </Border.Effect>
 
             <Grid Margin="0">
@@ -75,7 +75,7 @@
                 </Canvas>
 
                 <!-- Continuous rectangular bar with 1px border and 1px dividers -->
-                <Border Width="144" Height="8"
+                <Border Width="146" Height="8"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Bottom"
                         Margin="0,0,0,30"
@@ -84,11 +84,14 @@
                         BorderThickness="1"
                         CornerRadius="1"
                         SnapsToDevicePixels="True">
-                    <UniformGrid x:Name="SegmentsGrid"
-                                 Columns="16"
-                                 Rows="1"
-                                 SnapsToDevicePixels="True">
-                    </UniformGrid>
+                    <Grid x:Name="SegmentsGrid" SnapsToDevicePixels="True">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                    </Grid>
                 </Border>
             </Grid>
         </Border>
