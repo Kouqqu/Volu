@@ -1,7 +1,7 @@
 // ==WindhawkMod==
 // @id              volu-macos-volume-hud
 // @name            Volu - macOS Volume HUD
-// @description     Classic macOS Yosemite/Sierra-style volume HUD overlay with authentic audio clicks
+// @description     Authentic macOS-style volume HUD for Windows with audio clicks
 // @version         1.0.0
 // @author          Kouqqu
 // @github          https://github.com/Kouqqu/Volu
@@ -13,16 +13,12 @@
 /*
 # Volu - macOS Volume HUD
 
-Brings the iconic, elegant macOS (OS X Yosemite / El Capitan / Sierra / Mojave) volume HUD overlay to Windows with authentic audio feedback and fullscreen game support.
+Authentic macOS-style volume HUD for Windows with audio clicks.
 
-## Features
-- **Authentic macOS Design:** Frosted translucent squircle card with soft shadow, exact Apple-proportioned dark charcoal speaker icon, and 16 hairline-divided volume segments.
-- **Audio Feedback:** Authentic macOS wooden pop clicks and modern tactile clicks, played asynchronously with zero UI lag.
-- **Fullscreen & Game Support:** Renders on top of borderless and exclusive fullscreen games using native Windows notification bands (`ZBID_IMMERSIVE_NOTIFICATION`).
-- **Multi-Monitor Smart Placement:** Automatically displays on whichever monitor contains the active game or foreground application.
-- **Native Flyout Replacement:** Completely suppresses the default Windows volume flyout when volume keys are pressed.
-- **Customizable:** Change sound styles, timeout duration, position, and hotkeys in Windhawk settings.
-- **Default Hotkeys:** `Ctrl+Alt+Up` (Vol Up), `Ctrl+Alt+Down` (Vol Down), `Ctrl+Alt+V` (Mute/Unmute).
+### Shortcuts
+- `Ctrl + Alt + Up` — Volume Up
+- `Ctrl + Alt + Down` — Volume Down
+- `Ctrl + Alt + V` — Mute / Unmute
 */
 // ==/WindhawkModReadme==
 

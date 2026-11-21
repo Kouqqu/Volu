@@ -1,6 +1,6 @@
 # Volu - Windhawk Mod (macOS Volume HUD)
 
-Официальный твик **Volu** для [Windhawk](https://windhawk.net/), переносящий легендарный полупрозрачный оверлей громкости macOS (OS X Yosemite / El Capitan / Sierra / Mojave) в Windows.
+Официальный мод **Volu** для [Windhawk](https://windhawk.net/) — аутентичный индикатор громкости в стиле macOS для Windows.
 
 ## Преимущества твика перед отдельным приложением
 1. **Работает поверх всех игр (включая Fortnite, CS2, Cyberpunk):**  
