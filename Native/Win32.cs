@@ -11,6 +11,7 @@ namespace VolumeHUD.Native
         public const int WS_EX_TRANSPARENT = 0x00000020;
         public const int WS_EX_NOACTIVATE = 0x08000000;
         public const int WS_EX_LAYERED = 0x00080000;
+        public const int WS_EX_TOPMOST = 0x00000008;
 
         public const int SW_HIDE = 0;
         public const int SW_SHOW = 5;
@@ -24,6 +25,9 @@ namespace VolumeHUD.Native
         public const int VK_VOLUME_MUTE = 0xAD;
         public const int VK_VOLUME_DOWN = 0xAE;
         public const int VK_VOLUME_UP = 0xAF;
+
+        public const int VK_CONTROL = 0x11;
+        public const int VK_MENU = 0x12; // Alt key
 
         public const int DWMWA_NCRENDERING_POLICY = 2;
         public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
@@ -72,10 +76,26 @@ namespace VolumeHUD.Native
         [DllImport("dwmapi.dll")]
         public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
+        public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        public const uint SWP_NOSIZE = 0x0001;
+        public const uint SWP_NOMOVE = 0x0002;
+        public const uint SWP_NOACTIVATE = 0x0010;
+        public const uint SWP_SHOWWINDOW = 0x0040;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        public static extern short GetAsyncKeyState(int vKey);
+
         public static void MakeClickThroughAndNoActivate(IntPtr hwnd)
         {
             var exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE).ToInt64();
-            exStyle |= WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE;
+            exStyle |= WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOPMOST;
             SetWindowLongPtr(hwnd, GWL_EXSTYLE, new IntPtr(exStyle));
         }
         public const int WM_HOTKEY = 0x0312;

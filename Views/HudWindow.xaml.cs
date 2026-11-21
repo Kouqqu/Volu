@@ -94,8 +94,19 @@ namespace VolumeHUD.Views
                 _blocks[i].Background = (i < filledCount) ? ActiveBrush : InactiveBrush;
             }
 
-            // Show window
+            // Show window and ensure it is brought to the top over games
             Show();
+
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                Win32.SetWindowPos(
+                    hwnd,
+                    Win32.HWND_TOPMOST,
+                    0, 0, 0, 0,
+                    Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_SHOWWINDOW
+                );
+            }
 
             // Clear previous animation and snap to full opacity
             BeginAnimation(OpacityProperty, null);
@@ -128,8 +139,11 @@ namespace VolumeHUD.Views
         {
             try
             {
-                var cursor = System.Windows.Forms.Cursor.Position;
-                var screen = System.Windows.Forms.Screen.FromPoint(cursor);
+                // First attempt: check the monitor of the current foreground window (e.g. fullscreen game)
+                IntPtr fgHwnd = Win32.GetForegroundWindow();
+                System.Windows.Forms.Screen screen = (fgHwnd != IntPtr.Zero)
+                    ? System.Windows.Forms.Screen.FromHandle(fgHwnd)
+                    : System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position);
 
                 var dpi = VisualTreeHelper.GetDpi(this);
                 double dpiX = dpi.DpiScaleX;

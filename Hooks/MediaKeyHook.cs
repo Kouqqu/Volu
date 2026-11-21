@@ -29,6 +29,7 @@ namespace VolumeHUD.Hooks
         private const int HOTKEY_ID_UP = 9001;
         private const int HOTKEY_ID_DOWN = 9002;
         private const int HOTKEY_ID_MUTE = 9003;
+        private const int HOTKEY_ID_MUTE_V = 9004;
 
         public void Start(IntPtr hwnd)
         {
@@ -42,6 +43,7 @@ namespace VolumeHUD.Hooks
                 Win32.RegisterHotKey(_hwnd, HOTKEY_ID_UP, Win32.MOD_CONTROL | Win32.MOD_ALT, Win32.VK_UP);
                 Win32.RegisterHotKey(_hwnd, HOTKEY_ID_DOWN, Win32.MOD_CONTROL | Win32.MOD_ALT, Win32.VK_DOWN);
                 Win32.RegisterHotKey(_hwnd, HOTKEY_ID_MUTE, Win32.MOD_CONTROL | Win32.MOD_ALT, Win32.VK_M);
+                Win32.RegisterHotKey(_hwnd, HOTKEY_ID_MUTE_V, Win32.MOD_CONTROL | Win32.MOD_ALT, 0x56); // Key 'V' is 'М' on Russian layout
 
                 ComponentDispatcher.ThreadFilterMessage += OnThreadFilterMessage;
             }
@@ -86,6 +88,7 @@ namespace VolumeHUD.Hooks
                 Win32.UnregisterHotKey(_hwnd, HOTKEY_ID_UP);
                 Win32.UnregisterHotKey(_hwnd, HOTKEY_ID_DOWN);
                 Win32.UnregisterHotKey(_hwnd, HOTKEY_ID_MUTE);
+                Win32.UnregisterHotKey(_hwnd, HOTKEY_ID_MUTE_V);
                 _hwnd = IntPtr.Zero;
             }
         }
@@ -113,7 +116,7 @@ namespace VolumeHUD.Hooks
                     });
                     handled = true;
                 }
-                else if (id == HOTKEY_ID_MUTE)
+                else if (id == HOTKEY_ID_MUTE || id == HOTKEY_ID_MUTE_V)
                 {
                     ThreadPool.QueueUserWorkItem(_ =>
                     {
@@ -130,29 +133,33 @@ namespace VolumeHUD.Hooks
             {
                 var kbd = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
 
-                if (kbd.vkCode == Win32.VK_VOLUME_UP || kbd.vkCode == Win32.VK_VOLUME_DOWN || kbd.vkCode == Win32.VK_VOLUME_MUTE)
+                bool isCtrl = (Win32.GetAsyncKeyState(Win32.VK_CONTROL) & 0x8000) != 0;
+                bool isAlt = (Win32.GetAsyncKeyState(Win32.VK_MENU) & 0x8000) != 0;
+
+                bool isVolUp = kbd.vkCode == Win32.VK_VOLUME_UP || (isCtrl && isAlt && kbd.vkCode == Win32.VK_UP);
+                bool isVolDown = kbd.vkCode == Win32.VK_VOLUME_DOWN || (isCtrl && isAlt && kbd.vkCode == Win32.VK_DOWN);
+                // Mute: physical VK_VOLUME_MUTE, or Ctrl+Alt+M (0x4D, 'Ь' on RU), or Ctrl+Alt+V (0x56, 'М' on RU)
+                bool isMute = kbd.vkCode == Win32.VK_VOLUME_MUTE || (isCtrl && isAlt && (kbd.vkCode == 0x4D || kbd.vkCode == 0x56));
+
+                if (isVolUp || isVolDown || isMute)
                 {
                     if (wParam == (IntPtr)Win32.WM_KEYDOWN || wParam == (IntPtr)Win32.WM_SYSKEYDOWN)
                     {
-                        uint vk = kbd.vkCode;
-                        // Execute volume and audio actions on a background thread pool task.
-                        // This guarantees HookCallback returns (IntPtr)1 immediately (< 1ms),
-                        // preventing Windows from silently dropping the hook under LowLevelHooksTimeout!
                         ThreadPool.QueueUserWorkItem(_ =>
                         {
                             try
                             {
-                                if (vk == Win32.VK_VOLUME_UP)
+                                if (isVolUp)
                                 {
                                     AudioManager.Instance.VolumeUp();
                                     SoundEngine.Play();
                                 }
-                                else if (vk == Win32.VK_VOLUME_DOWN)
+                                else if (isVolDown)
                                 {
                                     AudioManager.Instance.VolumeDown();
                                     SoundEngine.Play();
                                 }
-                                else if (vk == Win32.VK_VOLUME_MUTE)
+                                else if (isMute)
                                 {
                                     AudioManager.Instance.ToggleMute();
                                 }
@@ -162,7 +169,6 @@ namespace VolumeHUD.Hooks
                     }
 
                     // Always suppress both KEYDOWN and KEYUP for volume keys so Windows Shell NEVER receives them
-                    // and NEVER spawns the native Windows volume slider
                     return (IntPtr)1;
                 }
             }
