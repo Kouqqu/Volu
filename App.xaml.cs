@@ -27,15 +27,41 @@ namespace VolumeHUD
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
         }
 
+        private static readonly string LogFile = @"C:\Users\aleks\.gemini\antigravity\scratch\Volu\debug.log";
+
+        private static void Log(string message)
+        {
+            try
+            {
+                File.AppendAllText(LogFile, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}: {message}\n");
+            }
+            catch { }
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
+            Log("OnStartup called");
+
+            AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+            {
+                Log($"UnhandledException: {args.ExceptionObject}");
+            };
+
+            DispatcherUnhandledException += (s, args) =>
+            {
+                Log($"DispatcherUnhandledException: {args.Exception}");
+            };
+
             const string eventName = "Local\\Volu_ShowEvent_App";
             _eventWaitHandle = new EventWaitHandle(false, EventResetMode.AutoReset, eventName, out bool isNewInstance);
+
+            Log($"isNewInstance = {isNewInstance}");
 
             if (!isNewInstance)
             {
                 // Another instance is already running: wake it up to show the HUD
                 _eventWaitHandle.Set();
+                Log("Exiting because not new instance");
                 Shutdown();
                 return;
             }
@@ -74,9 +100,11 @@ namespace VolumeHUD
                 // Show preview HUD on launch so user immediately sees it working
                 _hudWindow.UpdateVolume(AudioManager.Instance.CurrentVolume, AudioManager.Instance.IsMuted);
                 SoundEngine.Play();
+                Log("Startup completed successfully, HUD shown, tray icon active");
             }
             catch (Exception ex)
             {
+                Log($"Catch in OnStartup: {ex}");
                 System.Windows.MessageBox.Show($"Ошибка при запуске Volu: {ex.Message}", "Volu", MessageBoxButton.OK, MessageBoxImage.Error);
                 Shutdown();
             }

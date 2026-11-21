@@ -14,52 +14,20 @@
         Opacity="0">
 
     <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-        <!-- Authentic macOS Frosted Dark Glass Volume HUD -->
+        <!-- Classic macOS Frosted Translucent Volume HUD -->
         <Border x:Name="HudBorder"
                 Width="200" Height="200"
-                CornerRadius="28"
+                CornerRadius="26"
+                Background="#D4DFE5EC"
                 SnapsToDevicePixels="True">
-            
-            <!-- Glass Background -->
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#CC202731" Offset="0.0" />
-                    <GradientStop Color="#D6151A22" Offset="1.0" />
-                </LinearGradientBrush>
-            </Border.Background>
-
-            <!-- 1px Glass Highlight Border -->
-            <Border.BorderBrush>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#42FFFFFF" Offset="0.0" />
-                    <GradientStop Color="#1EFFFFFF" Offset="0.5" />
-                    <GradientStop Color="#0AFFFFFF" Offset="1.0" />
-                </LinearGradientBrush>
-            </Border.BorderBrush>
-            <Border.BorderThickness>
-                <Thickness Left="1" Top="1" Right="1" Bottom="1" />
-            </Border.BorderThickness>
 
             <Border.Effect>
-                <DropShadowEffect Color="#000000" BlurRadius="24" ShadowDepth="4" Opacity="0.40" Direction="270" />
+                <DropShadowEffect Color="#000000" BlurRadius="22" ShadowDepth="4" Opacity="0.25" Direction="270" />
             </Border.Effect>
 
             <Grid Margin="0">
-                <!-- Inner top glass rim reflection -->
-                <Border CornerRadius="27" Margin="1" IsHitTestVisible="False">
-                    <Border.BorderBrush>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                            <GradientStop Color="#18FFFFFF" Offset="0.0" />
-                            <GradientStop Color="#00FFFFFF" Offset="0.30" />
-                        </LinearGradientBrush>
-                    </Border.BorderBrush>
-                    <Border.BorderThickness>
-                        <Thickness Left="1" Top="1" Right="1" Bottom="0" />
-                    </Border.BorderThickness>
-                </Border>
-
-                <!-- Speaker Icon Area (Exact macOS proportions: 124x86, centered) -->
-                <Canvas Width="124" Height="86"
+                <!-- Speaker Icon Area (Classic Dark Icon: #1C1E24) -->
+                <Canvas Width="120" Height="86"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Top"
                         Margin="0,38,0,0">
@@ -67,55 +35,59 @@
                     <!-- Speaker Body -->
                     <Path x:Name="SpeakerBody"
                           Data="M 8,26 H 25 L 53,7 C 55,5.5 57,7 57,9 V 77 C 57,79 55,80.5 53,79 L 25,60 H 8 C 5.8,60 4,58.2 4,56 V 30 C 4,27.8 5.8,26 8,26 Z"
-                          Fill="#BFC4C9"
-                          Stroke="#BFC4C9"
+                          Fill="#1C1E24"
+                          Stroke="#1C1E24"
                           StrokeThickness="1"
                           StrokeLineJoin="Round" />
 
                     <!-- Sound Wave 1 (Inner) -->
                     <Path x:Name="Wave1"
                           Data="M 71,26 A 24,24 0 0 1 71,60"
-                          Stroke="#BFC4C9"
-                          StrokeThickness="5.2"
+                          Stroke="#1C1E24"
+                          StrokeThickness="4.2"
                           StrokeStartLineCap="Round"
                           StrokeEndLineCap="Round" />
 
                     <!-- Sound Wave 2 (Middle) -->
                     <Path x:Name="Wave2"
                           Data="M 88,21 A 38,38 0 0 1 88,65"
-                          Stroke="#BFC4C9"
-                          StrokeThickness="5.2"
+                          Stroke="#1C1E24"
+                          StrokeThickness="4.2"
                           StrokeStartLineCap="Round"
                           StrokeEndLineCap="Round" />
 
                     <!-- Sound Wave 3 (Outer) -->
                     <Path x:Name="Wave3"
                           Data="M 105,16 A 52,52 0 0 1 105,70"
-                          Stroke="#BFC4C9"
-                          StrokeThickness="5.2"
+                          Stroke="#1C1E24"
+                          StrokeThickness="4.2"
                           StrokeStartLineCap="Round"
                           StrokeEndLineCap="Round" />
 
-                    <!-- Authentic macOS Mute Slash: diagonal line cutting across speaker and waves -->
+                    <!-- Classic macOS Mute Slash: diagonal line cutting across speaker and waves -->
                     <Line x:Name="MuteSlash"
-                          X1="5" Y1="14" X2="120" Y2="72"
-                          Stroke="#BFC4C9"
-                          StrokeThickness="5.2"
+                          X1="4" Y1="14" X2="118" Y2="72"
+                          Stroke="#1C1E24"
+                          StrokeThickness="4.6"
                           StrokeStartLineCap="Round"
                           StrokeEndLineCap="Round"
                           Visibility="Collapsed" />
                 </Canvas>
 
-                <!-- 16 Segmented Volume Blocks (macOS discrete 16-step meter) -->
-                <StackPanel Orientation="Vertical" VerticalAlignment="Bottom" Margin="0,0,0,28">
+                <!-- Continuous rectangular bar with 16 segments (Dark track with white filled blocks) -->
+                <Border Width="144" Height="7"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,0,30"
+                        Background="#1C1E24"
+                        CornerRadius="1"
+                        SnapsToDevicePixels="True">
                     <UniformGrid x:Name="SegmentsGrid"
                                  Columns="16"
                                  Rows="1"
-                                 Height="8"
-                                 Width="152"
-                                 HorizontalAlignment="Center">
+                                 SnapsToDevicePixels="True">
                     </UniformGrid>
-                </StackPanel>
+                </Border>
             </Grid>
         </Border>
     </Grid>

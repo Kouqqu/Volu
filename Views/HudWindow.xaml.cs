@@ -17,22 +17,20 @@ namespace VolumeHUD.Views
         private readonly List<Border> _blocks = new();
         private readonly DispatcherTimer _hideTimer;
 
-        // Exact macOS Dark Glass palette
-        private static readonly Brush ActiveBrush = new SolidColorBrush(Color.FromRgb(220, 224, 228));
-        private static readonly Brush InactiveBrush = new SolidColorBrush(Color.FromRgb(53, 59, 68));
+        // Classic macOS HUD: White filled segments over a continuous dark track
+        private static readonly Brush ActiveBrush = new SolidColorBrush(Color.FromRgb(255, 255, 255));
+        private static readonly Brush InactiveBrush = System.Windows.Media.Brushes.Transparent;
 
         public HudWindow()
         {
             InitializeComponent();
 
-            // Create 16 blocks for the segmented volume meter
+            // Create 16 segmented blocks separated by 1px hairline dividers
             for (int i = 0; i < 16; i++)
             {
                 var block = new Border
                 {
-                    Height = 8,
-                    CornerRadius = new CornerRadius(1.5),
-                    Margin = new Thickness(1.2, 0, 1.2, 0),
+                    Margin = (i < 15) ? new Thickness(0, 0, 1, 0) : new Thickness(0),
                     Background = InactiveBrush,
                     SnapsToDevicePixels = true
                 };
@@ -72,7 +70,7 @@ namespace VolumeHUD.Views
 
             CenterOnActiveScreen();
 
-            // Update speaker icon & waves according to authentic macOS
+            // Update speaker icon & waves according to classic macOS
             if (isMuted)
             {
                 // In macOS mute state, speaker body & 3 waves are shown with diagonal strike-through slash
@@ -89,7 +87,7 @@ namespace VolumeHUD.Views
                 Wave3.Visibility = volume > 0.66f ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            // Update 16 blocks (all empty when muted)
+            // Update 16 blocks (all empty/transparent showing dark track when muted)
             int filledCount = isMuted ? 0 : (int)Math.Round(volume * 16.0f);
             for (int i = 0; i < 16; i++)
             {
