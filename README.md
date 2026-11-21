@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  Authentic macOS-style volume HUD for Windows.
+  Authentic macOS-style volume HUD for Windows (standalone application).
 </p>
 
 ### Shortcuts
@@ -14,16 +14,16 @@
 - `Ctrl + Alt + Down` — Volume Down
 - `Ctrl + Alt + V` — Mute / Unmute
 
-### Windhawk Mod
+### Windhawk Mod (Optional)
 
 1. In **Windhawk**, go to **Settings** and enable **Developer mode**.
-2. Go to **Explore** tab and click **Create a new mod**.
+2. Go to **Search** tab and click **Create a new mod**.
 3. Paste the code from [`windhawk/volu-macos-volume-hud.wh.cpp`](windhawk/volu-macos-volume-hud.wh.cpp) and click **Compile** (`Ctrl + B`).
 
 ---
 
 <p align="center">
-  Аутентичный индикатор громкости в стиле macOS для Windows.
+  Аутентичный индикатор громкости в стиле macOS для Windows (отдельная программа).
 </p>
 
 ### Горячие клавиши
@@ -32,10 +32,10 @@
 - `Ctrl + Alt + Вниз` — уменьшить громкость
 - `Ctrl + Alt + V` — выключить / включить звук
 
-### Версия для Windhawk
+### Мод для Windhawk (отдельно)
 
 1. В **Windhawk** зайдите в **Параметры** и включите **Режим разработчика**.
-2. Перейдите во вкладку **Обзор** и нажмите **Создать новый мод**.
+2. Перейдите во вкладку **Поиск** и нажмите **Создать новую модификацию**.
 3. Вставьте код из [`windhawk/volu-macos-volume-hud.wh.cpp`](windhawk/volu-macos-volume-hud.wh.cpp) и нажмите **Скомпилировать** (`Ctrl + B`).
 
 <br>
