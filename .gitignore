@@ -1,0 +1,26 @@
+## Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+publish/
+*.exe
+*.dll
+*.pdb
+
+## User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Visual Studio / Rider / VSCode
+.vs/
+.idea/
+*.ide/
+.vscode/
+
+## OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini

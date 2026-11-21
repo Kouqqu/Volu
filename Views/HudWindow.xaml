@@ -1,0 +1,92 @@
+<Window x:Class="VolumeHUD.Views.HudWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Volu"
+        Height="260" Width="260"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="Manual"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True"
+        Opacity="0">
+
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+        <!-- Classic macOS Volume HUD -->
+        <Border x:Name="HudBorder"
+                Width="200" Height="200"
+                CornerRadius="24"
+                Background="#E61A1A1C"
+                BorderBrush="#38FFFFFF"
+                BorderThickness="1"
+                SnapsToDevicePixels="True">
+            <Border.Effect>
+                <DropShadowEffect Color="#000000" BlurRadius="18" ShadowDepth="4" Opacity="0.35" />
+            </Border.Effect>
+
+            <Grid Margin="18">
+                <!-- Speaker Icon Area -->
+                <Canvas Width="70" Height="70"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Margin="0,0,0,32">
+                    
+                    <!-- Speaker Body -->
+                    <Path x:Name="SpeakerBody"
+                          Data="M12,25 L12,45 L24,45 L38,58 L38,12 L24,25 Z"
+                          Fill="#F2F2F2"
+                          Stroke="#F2F2F2"
+                          StrokeThickness="1"
+                          StrokeLineJoin="Round"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round" />
+
+                    <!-- Sound Wave 1 (Inner) -->
+                    <Path x:Name="Wave1"
+                          Data="M44,27 A12,12 0 0 1 44,43"
+                          Stroke="#F2F2F2"
+                          StrokeThickness="3.2"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round" />
+
+                    <!-- Sound Wave 2 (Middle) -->
+                    <Path x:Name="Wave2"
+                          Data="M51,20 A21,21 0 0 1 51,50"
+                          Stroke="#F2F2F2"
+                          StrokeThickness="3.2"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round" />
+
+                    <!-- Sound Wave 3 (Outer) -->
+                    <Path x:Name="Wave3"
+                          Data="M58,13 A30,30 0 0 1 58,57"
+                          Stroke="#F2F2F2"
+                          StrokeThickness="3.2"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round" />
+
+                    <!-- Mute Cross -->
+                    <Path x:Name="MuteCross"
+                          Data="M45,28 L57,42 M57,28 L45,42"
+                          Stroke="#E0E0E0"
+                          StrokeThickness="3.5"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          Visibility="Collapsed" />
+                </Canvas>
+
+                <!-- 16 Segmented Volume Blocks -->
+                <StackPanel Orientation="Vertical" VerticalAlignment="Bottom" Margin="0,0,0,12">
+                    <UniformGrid x:Name="SegmentsGrid"
+                                 Columns="16"
+                                 Rows="1"
+                                 Height="8"
+                                 Width="158"
+                                 HorizontalAlignment="Center">
+                    </UniformGrid>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
