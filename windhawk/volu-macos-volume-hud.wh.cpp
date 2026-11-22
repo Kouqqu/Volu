@@ -724,9 +724,10 @@ static void RenderHudContent(HWND hWnd, float volume, bool isMuted) {
         // Copy PARGB bits to DIB section
         BitmapData data;
         Rect lockRect(0, 0, width, height);
-        bmp.LockBits(&lockRect, ImageLockModeRead, PixelFormat32bppPARGB, &data);
-        memcpy(g_pvBits, data.Scan0, width * height * 4);
-        bmp.UnlockBits(&data);
+        if (bmp.LockBits(&lockRect, ImageLockModeRead, PixelFormat32bppPARGB, &data) == Ok) {
+            memcpy(g_pvBits, data.Scan0, width * height * 4);
+            bmp.UnlockBits(&data);
+        }
     }
 
     // Apply to Layered Window
@@ -936,7 +937,12 @@ static DWORD WINAPI HudThreadProc(LPVOID lpParam) {
     // 2. Initialize COM & GDI+
     HRESULT hrCo = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     GdiplusStartupInput gdiplusStartupInput;
-    GdiplusStartup(&g_gdiplusToken, &gdiplusStartupInput, nullptr);
+    if (GdiplusStartup(&g_gdiplusToken, &gdiplusStartupInput, nullptr) != Ok) {
+        Wh_Log(L"GdiplusStartup failed");
+        SetEvent(g_hHudReady);
+        if (SUCCEEDED(hrCo)) CoUninitialize();
+        return 0;
+    }
 
     // 3. Initialize Audio Manager
     g_audioMgr.Initialize();
@@ -979,6 +985,7 @@ static DWORD WINAPI HudThreadProc(LPVOID lpParam) {
         );
     }
     if (!g_hHudWnd) {
+        Wh_Log(L"CreateWindowInBand not available or failed (%u), using CreateWindowExW", GetLastError());
         g_hHudWnd = CreateWindowExW(
             exStyle,
             HUD_WINDOW_CLASS,
